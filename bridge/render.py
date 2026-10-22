@@ -1,9 +1,9 @@
 """Pixel-exact OLED renderer. Standard library only; same bytes go to USB/PNG."""
-from pathlib import Path
 import struct
 import zlib
 
 from .model import countdown, freshness
+from .files import atomic_write
 
 # Original 5x7 bitmap alphabet, rows top to bottom; no host font dependency.
 GLYPHS = {
@@ -165,8 +165,4 @@ def png_bytes(frame, scale=4):
 
 
 def save_png(path, frame, scale=4):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_suffix(".tmp")
-    temp.write_bytes(png_bytes(frame, scale))
-    temp.replace(path)
+    atomic_write(path,png_bytes(frame,scale))

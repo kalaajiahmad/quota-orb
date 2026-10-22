@@ -18,16 +18,13 @@ from .render import render, save_png
 from .claude import ClaudeFileClient
 from .layout import LayoutStore, render_layout
 from .widgets import Context
+from .files import atomic_write
 
 MUTEX_NAME = 'Local\\QuotaOrbBridge'
 
 
 def atomic_json(path, data):
-    path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
-    temporary.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
-    temporary.replace(path)
+    atomic_write(path,(json.dumps(data,indent=2)+'\n').encode('utf-8'))
 
 
 class UsageWorker(threading.Thread):
