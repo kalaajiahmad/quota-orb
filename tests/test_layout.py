@@ -1,5 +1,6 @@
 from copy import deepcopy
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
@@ -83,6 +84,26 @@ class LayoutTests(unittest.TestCase):
         expected = Canvas()
         expected.rect(10,10,2,2)
         self.assertEqual(target.data,expected.data)
+
+    def test_equal_timestamp_and_size_cannot_hide_layout_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'layout.json'
+            first = starter()
+            save(path,first)
+            stamp = path.stat().st_mtime_ns
+            size = path.stat().st_size
+            store = LayoutStore(path)
+            self.assertEqual(store.read(),first)
+            changed = starter()
+            changed['widgets'][0]['x'] = 2
+            save(path,changed)
+            self.assertEqual(path.stat().st_size,size)
+            os.utime(path,ns=(stamp,stamp))
+            self.assertEqual(store.read(),changed)
+            path.write_text(path.read_text().replace('"version": 1','"version": 2'))
+            os.utime(path,ns=(stamp,stamp))
+            self.assertEqual(store.read(),changed)
+            self.assertIsNotNone(store.error)
 
     def test_all_registered_widgets_render_missing_and_live_data(self):
         for key,widget in WIDGETS.items():

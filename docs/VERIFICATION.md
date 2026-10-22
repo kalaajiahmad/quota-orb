@@ -2,7 +2,7 @@
 
 ## Software and device
 
-- 53 local checks cover parsing, quota freshness, transport, worker lifecycle, provider/security flows, tray failure and pause/resume cleanup, exact acknowledged mirror pixels at native/enlarged scales, bounded layout imports, widget clipping, drag/drop, undo, apply preservation, same-window navigation/draft preservation, interrupted transitions, and Windows app identity.
+- 54 local checks cover parsing, quota freshness, transport, worker lifecycle, provider/security flows, tray failure and pause/resume cleanup, exact acknowledged mirror pixels at native/enlarged scales, bounded layout imports/rapid-save recovery, widget clipping, drag/drop, undo, apply preservation, same-window navigation/draft preservation, interrupted transitions, and Windows app identity.
 - Firmware compiles for the pinned Heltec ESP32 target.
 - The original device prototype passed frame acknowledgement, corrupt-CRC rejection, oversized/partial parser recovery, the offline watchdog, and serial close/reopen recovery.
 - The physical OLED was confirmed readable and upright.
