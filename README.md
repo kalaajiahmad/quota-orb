@@ -131,7 +131,7 @@ The rounded enclosure has a copper-colour accent, a removable rear cover, a slid
 
 ## Validation and limits
 
-Local validation passed 53 checks covering quota parsing, freshness, transport, failure recovery, credential-free login dispatch, event sanitization, tray lifecycle, pixel-exact mirroring, layout validation, widget clipping, desktop editing, one-window navigation, and Windows app identity. The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
+Local validation passed 54 checks covering quota parsing, freshness, transport, failure recovery, credential-free login dispatch, event sanitization, tray lifecycle, pixel-exact mirroring, layout validation/rapid-save recovery, widget clipping, desktop editing, one-window navigation, and Windows app identity. The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
 
 The enclosure builder asserts valid solids, manifold meshes, nominal PCB/header/fastener clearances, and left-side USB access. The print plate has been sliced with supports disabled. These checks do not prove physical fit, thermal performance, or cable stability. See [verification scope](docs/VERIFICATION.md).
 

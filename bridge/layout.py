@@ -94,16 +94,15 @@ class LayoutStore:
         self.path = Path(path)
         self.value = deepcopy(CLASSIC)
         self.error = None
-        self.stamp = None
 
     def read(self):
         try:
-            stamp = self.path.stat().st_mtime_ns
-            if stamp!=self.stamp:
-                value = load(self.path)
-                self.value, self.stamp, self.error = value,stamp,None
+            # The bounded 16 KiB file is read at 1 Hz. Timestamp-only caches miss
+            # rapid saves on filesystems/clocks with coarse timestamp resolution.
+            self.value = load(self.path)
+            self.error = None
         except FileNotFoundError:
-            self.value, self.stamp, self.error = deepcopy(CLASSIC),None,None
+            self.value, self.error = deepcopy(CLASSIC),None
         except (OSError,ValueError,TypeError):
             self.error = 'Invalid layout; retaining the last valid layout (classic on first launch)'
         return self.value
