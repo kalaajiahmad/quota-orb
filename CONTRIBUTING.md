@@ -40,4 +40,6 @@ Maintainers may request more evidence or decline changes whose security, compati
 
 Provider adapters must use supported interfaces, keep credentials with the provider client, reject missing/malformed quota values, and preserve freshness. Do not scrape credential caches or silently start model turns to estimate allowance. Preserve existing user settings when linking integrations.
 
+For widgets and portable layouts, follow [the widget API and validation guide](docs/WIDGETS.md). Widgets draw from shared read-only render inputs. Layouts remain bounded data-only JSON; they must never import code, start a provider request, or hide source freshness.
+
 Contributions use the project's MIT license. Third-party assets require clear redistribution rights and attribution.

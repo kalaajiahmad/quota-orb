@@ -77,11 +77,32 @@ Flashing replaces the previous firmware. Keep the backup private: old firmware c
 
 ## 5. Start and check the result
 
-Once **quota access** and **USB** are verified, click **Start monitor**. The wizard saves only the selected provider and serial port under ignored `.runtime/` preferences. It starts the background bridge and shows source state, USB state, and acknowledged frame count. A launch message alone is not proof that the device is working: wait for the acknowledged count to increase and check the OLED.
+Once **quota access** and **USB** are verified, click **Start monitor**. The wizard saves only the selected provider and serial port under ignored `.runtime/` preferences. It starts a **visible notification-area app** and shows source state, USB state, and acknowledged frame count. Start confirms that the icon registered with Windows. To verify the board is working, wait for the acknowledged count to increase and check the OLED.
 
 The display shows the selected provider, remaining percentage, reported window, reset countdown, and freshness. Codex polls every 60 seconds; the OLED redraws every second. Claude follows status-line events. Both retain a last good reading as **STALE** on failures. Expired reset timers wait for confirmation rather than inventing replenishment.
 
-Closing the wizard **leaves a started monitor running** while the PC is awake. Use **Stop monitor** or `Stop Quota Orb.cmd` to stop it. The board shows **USB OFFLINE** within six seconds. To change provider/account/board, stop, update the provider's official client if needed, then repeat account and USB checks. A named mutex prevents duplicate Quota Orb monitors.
+Closing setup **leaves the monitor running with its notification icon** while the PC is awake. Look beside the clock or under the **taskbar overflow arrow**. Windows controls this placement; drag the icon onto the taskbar or enable it in Windows taskbar settings if you want it always visible. Quota Orb does not change those preferences.
+
+| Icon / control | Meaning |
+|---|---|
+| Green status dot | Live provider data and connected USB |
+| Amber status dot | USB disconnected, stale data, or waiting for a refresh |
+| Red status dot | USB connected, but quota data unavailable or blocked |
+| Grey status dot | Paused, pausing/resuming, or stopping |
+| Click icon / **Open live display** | Open the live, acknowledged OLED mirror; **Edit layout** opens the studio |
+| Right-click → **Open setup** | Reopen provider and USB setup |
+| Right-click → **Show status** | Provider/source state, USB state, acknowledged frames |
+| Right-click → **Pause monitoring** | Close USB and stop this monitor's quota polling; keep the icon visible |
+| Right-click → **Resume monitoring** | Start a fresh provider client after the previous client has closed; reconnect USB |
+| Right-click → **Quit Quota Orb** | Stop the monitor, close its provider client, and remove the icon |
+
+An in-flight provider request may need time to finish. The icon shows **Pausing** or **Stopping** during cleanup; allow up to 40 seconds. The board shows **USB OFFLINE** within six seconds of frame updates stopping. Claude's separately configured status line remains active in Claude Code after Pause/Quit: use **Remove Claude link** in setup to stop that event cache. Quitting the monitor does not log out of a provider or close its independently opened windows.
+
+The live window reads the atomic local status record every 200 ms and displays only frames whose sequence/CRC were acknowledged by the board. OLED frames update at 1 Hz. **1×** maps one OLED pixel to one image pixel; **2×/4×/6×** enlarge without smoothing. If USB disconnects or monitoring pauses, the last confirmed frame remains clearly labeled; the board can independently show its offline watchdog screen. Brightness and the board's hardware rotation are panel settings, not framebuffer pixels, and are not reproduced by the mirror. Closing the live window leaves monitoring and its icon running. Quit closes the mirror after monitor shutdown.
+
+**Stop monitor** and `Stop Quota Orb.cmd` also stop the monitor and remove its icon. A named mutex prevents duplicate monitors. If Windows refuses icon registration or the icon thread fails, monitoring stops. There is no icon-free background fallback. Task Manager shows the local environment's `pythonw.exe` monitor and, for Codex, its owned `codex.exe app-server` child; the process command line includes `-m bridge`. No Windows service or scheduled task is installed.
+
+To change provider/account/board, stop, update the provider's official client if needed, then repeat account and USB checks.
 
 For subsequent use, `Run Quota Orb.cmd` reopens the wizard; `Start Quota Orb.cmd` starts directly using saved preferences. **Login startup is off by default**. Advanced users can run `scripts/Enable-Startup.ps1` to create a launcher in their own Startup folder, or `scripts/Disable-Startup.ps1` to remove it. The project must remain in its chosen location.
 
@@ -92,6 +113,20 @@ For subsequent use, `Run Quota Orb.cmd` reopens the wizard; `Start Quota Orb.cmd
 | Over 1.8 seconds | Flip the OLED 180 degrees |
 
 Do not hold PRG during reset/connection: it selects the ESP32 bootloader. Display settings reset after power loss.
+
+## 6. Design your OLED
+
+1. Click the notification icon to open the live display, then choose **Edit layout**. The **same window** transitions into Design with the active custom layout or a starter arrangement. **← Live display** switches back; your draft remains intact across view changes. Its preview is explicitly **simulated draft data**; it does not request account usage or send frames while you edit. Windows identifies the app as Quota Orb with its own icon rather than grouping its window under Python.
+2. Drag a widget from the palette onto the canvas, or double-click its palette card to place it. Select an existing widget and drag to move it. Movement follows the pointer, then snaps to a **2 px position grid** on release. Enter exact integer **X / Y / width / height** in the inspector and choose **Update size / position** for precise placement.
+3. Add **Custom text** and use **Update text** to change its label. Text uses the OLED's original 5×7 alphabet and clips at its widget bounds. Remove components or **Undo** changes. The renderer clips every widget to its own rectangle.
+4. Keep exactly one **Source status** widget. All widgets must fit inside **128×64** without overlap. Invalid drafts show a reason and disable **Apply to OLED**. This prevents a large reading from hiding freshness/error state.
+5. Choose **Apply to OLED**. Only the validated layout is saved under ignored `.runtime/layout.json`. A running monitor uses it on the next frame; resume first if paused. Return to the live mirror to confirm the exact board-acknowledged result. Applying while stopped saves the layout for next start.
+6. Choose **Use classic display** to restore the original renderer immediately. The editor retains your draft until closed, so Apply can switch back.
+7. **Export JSON** saves geometry, widget IDs, and any custom text you entered. It includes no live quota snapshot, account identifiers, credentials, or machine paths. Review your own custom text before sharing it. **Import JSON** accepts only a supported, valid data-only layout up to 16 KiB; unknown widget IDs, fields, executable/plugin directives, invalid geometry, and overlaps are refused. Import opens a draft; it does not automatically apply it.
+
+Example layouts are in [`layouts/`](../layouts). Provider/window/remaining/progress/reset widgets use the same selected quota window; short PRG presses still cycle available windows. The source-status widget exposes unavailable, stale, blocked, and expired-reset states. Missing quota stays unavailable, never zero.
+
+Community widgets are reviewed source changes, with a small drawing API and required tests. Layout files cannot install Python modules, run shell commands, or fetch code. Read the [widget contribution guide](WIDGETS.md) before adding a widget or sharing a layout.
 
 ## Security and local data
 
@@ -108,6 +143,8 @@ Do not hold PRG during reset/connection: it selects the ESP32 bootloader. Displa
 |---|---|
 | Launcher reports missing Python/Tk | Install Python 3.10+ with Tcl/Tk and PATH enabled; reopen the terminal |
 | Dependency installation fails | Check internet/proxy access to PyPI; rerun the launcher |
+| Cannot find the running icon | Check the taskbar overflow arrow; reopen setup to inspect status. Start fails if Windows cannot register an icon |
+| Icon is grey / board is offline | Resume monitoring from the icon's right-click menu; pausing intentionally stops frames |
 | Provider CLI missing | Use the official installation link, install its native CLI, reopen the wizard |
 | Browser signed in but quota check fails | Complete the official CLI sign-in; browser authentication alone is insufficient |
 | Codex returns no quota windows | Check subscription/account/workspace and compare with the provider's usage display |

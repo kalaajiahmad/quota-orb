@@ -7,7 +7,7 @@ if (-not (Test-Path -LiteralPath $processFile)) {
     return
 }
 Set-Content -LiteralPath (Join-Path $runtimePath 'stop') -Value 'stop' -Encoding ASCII
-$deadline = (Get-Date).AddSeconds(36)
+$deadline = (Get-Date).AddSeconds(48)
 while ((Test-Path -LiteralPath $processFile) -and (Get-Date) -lt $deadline) {
     Start-Sleep -Milliseconds 250
 }

@@ -2,10 +2,14 @@
 
 ## Software and device
 
-- 27 local bridge/onboarding checks cover parsing, multi-window limits, freshness, reset handling, framebuffer encoding, serial acknowledgement validation, subprocess lifecycle, and worker failure recovery.
+- 53 local checks cover parsing, quota freshness, transport, worker lifecycle, provider/security flows, tray failure and pause/resume cleanup, exact acknowledged mirror pixels at native/enlarged scales, bounded layout imports, widget clipping, drag/drop, undo, apply preservation, same-window navigation/draft preservation, interrupted transitions, and Windows app identity.
 - Firmware compiles for the pinned Heltec ESP32 target.
 - The original device prototype passed frame acknowledgement, corrupt-CRC rejection, oversized/partial parser recovery, the offline watchdog, and serial close/reopen recovery.
 - The physical OLED was confirmed readable and upright.
+
+Windows notification registration/removal was checked in a desktop session. UI tests construct the actual Tk view/editor and inspect image pixels and interaction state; fixture tests do not prove a particular monitor's DPI/appearance or physical panel rotation. Live USB/custom-layout checks are reported separately from synthetic desktop tests.
+
+The updated monitor was run against the connected V2 board: Windows confirmed notification registration, USB acknowledgements advanced, and a custom layout produced a valid sequence/CRC-confirmed mirror frame before classic mode was restored. The live desktop window was confirmed readable by its user. These checks did not reflash the board or validate a physical enclosure.
 
 Original live diagnostics are deliberately excluded. A new build or fork must run its own checks; local checks do not imply remote CI success or validation on another board.
 

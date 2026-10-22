@@ -9,6 +9,7 @@ import threading
 import time
 
 from .model import SourceError
+from . import __version__
 
 
 def find_codex(explicit=None):
@@ -59,7 +60,7 @@ class CodexClient:
                 messages.put({"_closed": True})
 
         threading.Thread(target=reader, daemon=True).start()
-        self.call("initialize", {"clientInfo": {"name": "quota_orb", "title": "Quota Orb", "version": "1.0.0"}})
+        self.call("initialize", {"clientInfo": {"name": "quota_orb", "title": "Quota Orb", "version": __version__}})
         self.send({"method": "initialized", "params": {}})
         return self
 
