@@ -123,7 +123,7 @@ Local validation passed 27 checks covering parsing, freshness, rendering, transp
 
 The enclosure builder asserts valid solids, manifold meshes, nominal PCB/header/fastener clearances, and left-side USB access. The print plate has been sliced with supports disabled. These checks do not prove physical fit, thermal performance, or cable stability. See [verification scope](docs/VERIFICATION.md).
 
-The public tree is intentionally focused on running and flashing this target. Development generators, test harnesses, audit/packaging scripts, and working scenes remain in an ignored local `tooling/` folder. CI compiles the bridge and builds the firmware.
+The public tree is focused on running, flashing, and maintaining this target. Reproducible project tests are versioned for contributors and CI. Development generators, hardware-validation tools, audit/packaging scripts, and working scenes remain in an ignored local `tooling/` folder. CI runs bridge tests on Windows and builds the firmware.
 
 ## Privacy by design
 
@@ -134,6 +134,8 @@ Running the bridge creates **local** aggregate usage previews and logs. They are
 ## Contribute
 
 Useful next steps are physical enclosure fit reports, supported provider adapters, and tested ports to other boards or operating systems. Include board revision, measured dimensions, and reproducible steps; omit account details and raw logs. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+
+PRs need a clear `type: description` title, completed purpose/implementation/validation sections, test evidence, passing CI, and review. New code dismisses stale approvals; review conversations must be resolved. See the [community standards](CODE_OF_CONDUCT.md).
 
 Code, original CAD, and original artwork are available under the [MIT license](LICENSE). Dependency and manufacturer trademarks remain with their respective owners.
 

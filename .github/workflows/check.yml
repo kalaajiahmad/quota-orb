@@ -1,21 +1,53 @@
 name: Checks
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
-  bridge:
+  pr-quality:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Validate pull request description
+        shell: python
+        run: |
+          import json, os, re
+          with open(os.environ['GITHUB_EVENT_PATH'], encoding='utf-8') as stream:
+              event = json.load(stream)
+          pr = event.get('pull_request')
+          if pr:
+              title, body = pr.get('title', ''), pr.get('body') or ''
+              assert re.fullmatch(r'(feat|fix|docs|hardware|build|ci|test|refactor|chore): .{10,90}', title), 'Use a descriptive type: title (10-90 characters after the prefix)'
+              assert len(body.strip()) >= 200, 'Describe the purpose, implementation, and validation'
+              for heading in ('## Purpose', '## Implementation', '## Validation', '## Checklist'):
+                  assert heading in body, 'Complete the pull request template'
+              assert not re.search(r'- \[ \]', body), 'Complete the checklist or explain exclusions in Validation and remove non-applicable items'
+              print('PR structure validated. Maintainer review must assess substance and evidence.')
+          else:
+              print('PR description check applies to pull requests.')
+  bridge:
+    runs-on: windows-latest
+    steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
       - run: pip install -r requirements.txt
       - run: python -m compileall -q bridge
+      - run: python -m unittest discover -s tests -v
   firmware:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
