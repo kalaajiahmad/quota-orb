@@ -5,7 +5,10 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from pathlib import Path
+import queue
 import signal
+import subprocess
+import sys
 import threading
 import time
 
@@ -13,6 +16,10 @@ from .codex import CodexClient
 from .model import SourceError, normalize, freshness
 from .render import render, save_png
 from .claude import ClaudeFileClient
+from .layout import LayoutStore, render_layout
+from .widgets import Context
+
+MUTEX_NAME = 'Local\\QuotaOrbBridge'
 
 
 def atomic_json(path, data):
@@ -44,6 +51,8 @@ class UsageWorker(threading.Thread):
                         client = (CodexClient(self.codex) if self.provider == 'codex'
                                   else ClaudeFileClient(self.runtime/'claude-usage.json'))
                         client.start()
+                    if self.stop_event.is_set():
+                        break
                     snapshot = normalize(client.read_limits(), now=getattr(client,'observed_at',None))
                     with self.lock:
                         self.snapshot, self.error = snapshot, None
@@ -61,6 +70,39 @@ class UsageWorker(threading.Thread):
         finally:
             if client:
                 client.close()
+
+
+class UsageSession:
+    """Pause cancels polling; resume waits for the old client to close first."""
+    def __init__(self, factory):
+        self.factory = factory
+        self.worker = None
+        self.stop_event = None
+        self.paused = False
+
+    def tick(self):
+        if not self.paused and (self.worker is None or
+                self.stop_event.is_set() and not self.worker.is_alive()):
+            self.stop_event = threading.Event()
+            self.worker = self.factory(self.stop_event)
+            self.worker.start()
+
+    def toggle(self):
+        self.paused = not self.paused
+        if self.paused and self.stop_event:
+            self.stop_event.set()
+
+    def get(self):
+        return self.worker.get() if self.worker else (None, None)
+
+    @property
+    def transitioning(self):
+        return bool(self.stop_event and self.stop_event.is_set() and self.worker.is_alive())
+
+    def close(self):
+        if self.stop_event:
+            self.stop_event.set()
+            self.worker.join(timeout=40)
 
 
 def main():
@@ -107,7 +149,7 @@ def main():
         kernel = ctypes.WinDLL("kernel32", use_last_error=True)
         kernel.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p]
         kernel.CreateMutexW.restype = ctypes.c_void_p
-        mutex = kernel.CreateMutexW(None, False, "Local\\QuotaOrbBridge")
+        mutex = kernel.CreateMutexW(None, False, MUTEX_NAME)
         if not mutex:
             raise OSError("Could not create bridge process mutex")
         if ctypes.get_last_error() == 183:
@@ -124,23 +166,67 @@ def main():
     stop_file = args.runtime / "stop"
     stop_file.unlink(missing_ok=True)
     atomic_json(args.runtime / "process.json", {"pid": os.getpid(), "started_at": time.time()})
-    worker = UsageWorker(stop, args.poll if args.provider == 'codex' else 2, args.codex, args.provider, args.runtime)
-    worker.start()
+    commands = queue.Queue()
+    tray = None
+    session = UsageSession(lambda event: UsageWorker(event,
+        args.poll if args.provider == 'codex' else 2, args.codex, args.provider, args.runtime))
     from .usb import Display
     display = Display(args.port)
     page, next_connect, acks, first, last_status = args.page, 0, 0, time.monotonic(), None
+    setup_window = None
+    preview_window = None
+    confirmed_frame = None
+    layouts = LayoutStore(args.runtime/'layout.json')
     try:
+        if os.name == 'nt':
+            from .tray import Tray
+            tray = Tray(commands, args.provider)
+            tray.start()  # No account/USB access before a visible icon is registered.
         while not stop.is_set():
             tick_start = time.monotonic()
             if stop_file.exists() or args.duration and tick_start - first >= args.duration:
                 break
-            snapshot, error = worker.get()
+            while not commands.empty():
+                command = commands.get_nowait()
+                if command == 'quit':
+                    stop.set()
+                elif command == 'toggle':
+                    session.toggle()
+                    if session.paused:
+                        display.close()
+                elif command == 'setup' and (setup_window is None or setup_window.poll() is not None):
+                    program = Path(sys.executable).with_name('pythonw.exe')
+                    setup_window = subprocess.Popen([str(program), '-m', 'bridge.onboarding'],
+                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW)
+                elif command == 'display' and (preview_window is None or preview_window.poll() is not None):
+                    program = Path(sys.executable).with_name('pythonw.exe')
+                    preview_window = subprocess.Popen([str(program), '-m', 'bridge.display',
+                        '--runtime', str(args.runtime.resolve())],
+                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW)
+                elif command == 'display':
+                    (args.runtime/'show-display').touch()
+            if tray and tray.failed.is_set():
+                raise OSError('Notification icon failed; monitoring has stopped')
+            if stop.is_set():
+                break
+            session.tick()
+            snapshot, error = session.get()
             now = time.time()
             if display.button_presses:
                 page += display.button_presses
                 display.button_presses = 0
             frame = render(snapshot, now, page, error is not None, max(150, args.poll * 2.5), provider=args.provider)
-            if not args.preview_only:
+            layout = layouts.read()
+            layout_mode = layout['mode']
+            if layout_mode == 'custom':
+                try:
+                    frame = render_layout(layout, Context(snapshot,now,page,error is not None,
+                        max(150,args.poll*2.5),args.provider))
+                except Exception:
+                    layout_mode = 'classic'
+                    layouts.error = 'Widget rendering failed; using the classic display'
+                    logging.warning(layouts.error)
+            if not args.preview_only and not session.paused and not session.transitioning:
                 try:
                     if display.serial is None and tick_start >= next_connect:
                         hello = display.connect()
@@ -148,6 +234,8 @@ def main():
                     if display.serial:
                         display.send(frame)
                         acks += 1
+                        confirmed_frame = {'pixels': frame.hex(), 'ack': display.last_ack,
+                            'acknowledged_at': time.time()}
                 except (OSError, ValueError) as exc:
                     logging.warning("USB unavailable: %s", exc)
                     display.close()
@@ -155,12 +243,19 @@ def main():
             save_png(args.output, frame)
             status = {"pid": os.getpid(), "running": True, "updated_at": now,
                 "provider": args.provider,
-                "source": freshness(snapshot, now, error is not None, max(150, args.poll * 2.5)),
+                "source": ('PAUSED' if session.paused else 'RESUMING' if session.transitioning else
+                    freshness(snapshot, now, error is not None, max(150, args.poll * 2.5))),
+                "paused": session.paused, "transitioning": session.transitioning,
+                "tray_registered": bool(tray and tray.registered),
                 "last_fetch": snapshot.fetched_at if snapshot else None,
                 "source_error": error, "port": display.port,
                 "usb_connected": display.serial is not None, "frames_acknowledged": acks,
                 "last_ack": display.last_ack, "snapshot": asdict(snapshot) if snapshot else None}
+            status['display_frame'] = confirmed_frame
+            status.update(layout_mode=layout_mode, layout_error=layouts.error)
             atomic_json(args.runtime / "status.json", status)
+            if tray:
+                tray.update(status)
             state = (status["source"], status["usb_connected"])
             if state != last_status:
                 logging.info("Display state: %s; USB %s", state[0], "connected" if state[1] else "disconnected")
@@ -168,12 +263,16 @@ def main():
             stop.wait(max(0, 1 - (time.monotonic() - tick_start)))
     finally:
         stop.set()
+        if tray:
+            tray.update({"stopping": True})
         display.close()
-        worker.join(timeout=32)
+        session.close()
+        if tray:
+            tray.close()
         status_path = args.runtime / "status.json"
         if status_path.exists():
             stopped = json.loads(status_path.read_text(encoding="utf-8"))
-            stopped.update(running=False, usb_connected=False, stopped_at=time.time())
+            stopped.update(running=False, usb_connected=False, tray_registered=False, stopped_at=time.time())
             atomic_json(status_path, stopped)
         (args.runtime / "process.json").unlink(missing_ok=True)
         stop_file.unlink(missing_ok=True)
@@ -185,4 +284,13 @@ def main():
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception:
+        logging.exception('Monitor failed')
+        if os.name == 'nt' and sys.stderr is None:
+            import ctypes
+            ctypes.windll.user32.MessageBoxW(None,
+                'Quota Orb could not run and has stopped. Open setup or inspect the local bridge log.',
+                'Quota Orb | Monitor stopped', 0x10)
+        raise

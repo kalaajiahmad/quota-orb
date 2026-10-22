@@ -17,6 +17,7 @@ from .model import normalize, SourceError, freshness
 from .providers import (ROOT,PROVIDERS,executable,launch_login,preferences,
                         save_preferences,start_monitor)
 from .usb import Display
+from .ui import MotionButton, windows_app_identity, window_icon
 
 BG, PANEL, TEXT, MUTED, ACCENT = '#0d1d23','#172e35','#e0eeee','#a9c4ca','#d7a17d'
 
@@ -24,6 +25,7 @@ class Wizard:
     def __init__(self,root):
         self.root = root
         self.root.title('Quota Orb | Connect your desk companion')
+        window_icon(self.root)
         self.root.geometry('880x860')
         self.root.minsize(820,720)
         self.root.configure(bg=BG)
@@ -97,7 +99,7 @@ class Wizard:
         ttk.Label(frame,textvariable=self.run_note,wraplength=730).pack(anchor='w',pady=(0,10))
         ttk.Separator(frame).pack(fill='x',pady=10)
         ttk.Label(frame,textvariable=self.note,wraplength=730,style='Muted.TLabel').pack(anchor='w')
-        ttk.Label(frame,text='No passwords, tokens, cookies, or API keys are entered here.\nClosing this window leaves a started monitor running. Startup at login is optional.',
+        ttk.Label(frame,text='No passwords, tokens, cookies, or API keys are entered here.\nClosing setup keeps the notification icon running. Click it for the live display and layout studio; right-click to pause or quit. Login startup is off by default.',
                   wraplength=730,style='Muted.TLabel').pack(anchor='w',pady=(12,0))
         self.root.protocol('WM_DELETE_WINDOW',self.close)
         self.scan_ports()
@@ -108,7 +110,7 @@ class Wizard:
         ttk.Label(parent,text=title,style='Section.TLabel').pack(anchor='w',pady=(4,5))
 
     def button(self,parent,text,command):
-        ttk.Button(parent,text=text,command=command).pack(side='left',padx=(0,8))
+        MotionButton(parent,text,command,accent=text in ('Start monitor','Check connection')).pack(side='left',padx=(0,8))
 
     def changed_provider(self):
         self.verified = None
@@ -272,7 +274,7 @@ class Wizard:
         def run():
             save_preferences(provider,port)
             start_monitor(provider,port)
-        self.work(run,lambda _:self.note.set('Monitor launched. Wait for an acknowledged frame below. Closing this wizard leaves it running.'))
+        self.work(run,lambda _:self.note.set('Monitor and notification icon started. Check the taskbar overflow arrow. Wait for an acknowledged frame below; right-click the icon to pause or quit.'))
 
     def stop(self):
         command = ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT/'scripts/Stop.ps1')]
@@ -284,7 +286,8 @@ class Wizard:
             data = json.loads((ROOT/'.runtime/status.json').read_text(encoding='utf-8'))
             active = data.get('running') and time.time()-data.get('updated_at',0)<8
             if active:
-                self.run_note.set(f"Running {data.get('provider','')} | source {data.get('source','unknown')} | USB {'connected' if data.get('usb_connected') else 'waiting'} | acknowledged frames {data.get('frames_acknowledged',0)}")
+                state = ('Pausing' if data.get('transitioning') else 'Paused') if data.get('paused') else 'Running'
+                self.run_note.set(f"{state} {data.get('provider','')} | source {data.get('source','unknown')} | USB {'connected' if data.get('usb_connected') else 'disconnected'} | acknowledged frames {data.get('frames_acknowledged',0)}")
             else:
                 self.run_note.set('Monitor is stopped')
         except (OSError,ValueError,TypeError):
@@ -300,6 +303,7 @@ class Wizard:
 def main():
     if os.name != 'nt':
         raise SystemExit('The guided desktop setup currently supports Windows. See docs/SETUP.md.')
+    windows_app_identity()
     root = tk.Tk()
     Wizard(root)
     root.mainloop()

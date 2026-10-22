@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "mode": "custom",
+  "widgets": [
+    {
+      "id": "provider",
+      "kind": "provider",
+      "x": 0,
+      "y": 0,
+      "width": 60,
+      "height": 8,
+      "options": {}
+    },
+    {
+      "id": "status",
+      "kind": "status",
+      "x": 80,
+      "y": 0,
+      "width": 48,
+      "height": 8,
+      "options": {}
+    },
+    {
+      "id": "line",
+      "kind": "line",
+      "x": 0,
+      "y": 10,
+      "width": 128,
+      "height": 1,
+      "options": {}
+    },
+    {
+      "id": "window",
+      "kind": "window",
+      "x": 0,
+      "y": 14,
+      "width": 100,
+      "height": 8,
+      "options": {}
+    },
+    {
+      "id": "remaining",
+      "kind": "remaining",
+      "x": 0,
+      "y": 25,
+      "width": 90,
+      "height": 23,
+      "options": {}
+    },
+    {
+      "id": "robot",
+      "kind": "robot",
+      "x": 100,
+      "y": 24,
+      "width": 28,
+      "height": 24,
+      "options": {}
+    },
+    {
+      "id": "progress",
+      "kind": "progress",
+      "x": 0,
+      "y": 49,
+      "width": 128,
+      "height": 5,
+      "options": {}
+    },
+    {
+      "id": "reset",
+      "kind": "reset",
+      "x": 0,
+      "y": 57,
+      "width": 96,
+      "height": 7,
+      "options": {}
+    },
+    {
+      "id": "age",
+      "kind": "age",
+      "x": 104,
+      "y": 57,
+      "width": 24,
+      "height": 7,
+      "options": {}
+    }
+  ]
+}

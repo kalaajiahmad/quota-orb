@@ -96,9 +96,21 @@ The launcher prepares a local Python environment and opens a four-step desktop w
 | **1 · Choose provider** | Capability is explicit: Codex available, Claude experimental, Gemini unavailable |
 | **2 · Connect account** | Official sign-in when needed, then a real quota-access check |
 | **3 · Connect Heltec** | Find the USB board and verify firmware/OLED; install firmware if required |
-| **4 · Start monitor** | Launch the background bridge and watch acknowledged frames increase |
+| **4 · Start monitor** | See the notification icon appear and watch acknowledged frames increase |
 
 **[Follow the complete setup guide →](docs/SETUP.md)** — every button, provider limitations, firmware backup/upload, troubleshooting, and where sensitive data stays.
+
+**Visible while running.** Quota Orb lives in the Windows notification area beside the clock (or under its overflow arrow). Its status dot shows live, waiting, error, or paused state. **Click for a live OLED mirror**; right-click for **Setup · Status · Pause/Resume · Quit**. Closing setup keeps the icon visible. Quit stops the monitor and removes it. Login startup is off by default; no service or scheduled task is installed. If icon registration fails, monitoring does not start. [Controls and process details →](docs/SETUP.md#5-start-and-check-the-result)
+
+### Your pixels. Your dashboard.
+
+![Three actual renderer outputs with synthetic usage: classic, widget starter, and minimal](assets/widget-layouts.png)
+
+The desktop view displays the **exact 1,024-byte framebuffer acknowledged by the Heltec**, with native **1×** and crisp **2× / 4× / 6×** scales. It marks paused/disconnected frames explicitly. It never estimates the device's screen by separately recalculating percentages.
+
+Open **Edit layout** to switch the same window into Design and arrange ten built-in widgets on a 128×64 canvas: **provider · source status · quota window · remaining % · progress bar · reset · age · animated companion · text · separator**. Drag from the palette, move components, edit dimensions, undo, and **Apply to OLED**. **← Live display** returns to the acknowledged output; switching preserves your draft. The native dark-and-copper interface has rounded controls, eased hover/view transitions, a Quota Orb taskbar identity, and a subtle live-status pulse; animation respects Windows' client-animation preference.
+
+Drafts use labeled simulated data. Applying changes switches the running renderer on its next frame; the live mirror confirms receipt. Layouts are portable, validated JSON with no executable code or account values. Source status stays mandatory, overlaps/out-of-bounds are rejected, and **Use classic display** restores the original view. [Studio guide →](docs/SETUP.md#6-design-your-oled) · [Build a community widget →](docs/WIDGETS.md)
 
 Codex uses `codex login`. Claude uses `claude auth login` plus an explicitly enabled local status line. Quota Orb never handles provider credentials. Claude quota events depend on an eligible active session; they are not continuous polling. Gemini cannot be connected in this release. A browser chat login alone does not establish a local CLI connection.
 
@@ -119,7 +131,7 @@ The rounded enclosure has a copper-colour accent, a removable rear cover, a slid
 
 ## Validation and limits
 
-Local validation passed 27 checks covering parsing, freshness, rendering, transport, failure recovery, credential-free login dispatch, event sanitization, and settings preservation. The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
+Local validation passed 53 checks covering quota parsing, freshness, transport, failure recovery, credential-free login dispatch, event sanitization, tray lifecycle, pixel-exact mirroring, layout validation, widget clipping, desktop editing, one-window navigation, and Windows app identity. The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
 
 The enclosure builder asserts valid solids, manifold meshes, nominal PCB/header/fastener clearances, and left-side USB access. The print plate has been sliced with supports disabled. These checks do not prove physical fit, thermal performance, or cable stability. See [verification scope](docs/VERIFICATION.md).
 
