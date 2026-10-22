@@ -9,7 +9,7 @@
 
 Windows notification registration/removal was checked in a desktop session. UI tests construct the actual Tk view/editor and inspect image pixels and interaction state; fixture tests do not prove a particular monitor's DPI/appearance or physical panel rotation. Live USB/custom-layout checks are reported separately from synthetic desktop tests.
 
-The updated monitor was run against the connected V2 board: Windows confirmed notification registration, USB acknowledgements advanced, and a custom layout produced a valid sequence/CRC-confirmed mirror frame before classic mode was restored. The live desktop window was confirmed readable by its user. These checks did not reflash the board or validate a physical enclosure.
+The updated monitor was run against the connected V2 board: Windows confirmed notification registration, USB acknowledgements advanced, and a custom layout produced a valid sequence/CRC-confirmed mirror frame before classic mode was restored. Its user confirmed the live desktop window was readable, Live/Design stayed in the same window, and the taskbar displayed the correct Quota Orb icon. These checks did not reflash the board or validate a physical enclosure.
 
 Original live diagnostics are deliberately excluded. A new build or fork must run its own checks; local checks do not imply remote CI success or validation on another board.
 
