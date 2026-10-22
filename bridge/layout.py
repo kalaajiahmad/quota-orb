@@ -6,6 +6,7 @@ import re
 
 from .render import Canvas, GLYPHS
 from .widgets import WIDGETS, WidgetCanvas
+from .files import atomic_write
 
 MAX_BYTES = 16384
 CLASSIC = {'version':1,'mode':'classic','widgets':[]}
@@ -73,11 +74,7 @@ def save(path, value):
     data = json.dumps(validate(value),indent=2)+'\n'
     if len(data.encode('utf-8'))>MAX_BYTES:
         raise ValueError('Layout file exceeds 16 KiB')
-    path = Path(path)
-    path.parent.mkdir(parents=True,exist_ok=True)
-    temporary = path.with_suffix('.tmp')
-    temporary.write_text(data,encoding='utf-8')
-    temporary.replace(path)
+    atomic_write(path,data.encode('utf-8'))
 
 
 def render_layout(value, context):

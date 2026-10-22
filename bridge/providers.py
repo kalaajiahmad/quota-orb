@@ -7,6 +7,7 @@ import subprocess
 
 from .codex import find_codex
 from .model import SourceError
+from .files import atomic_write
 
 ROOT = Path(__file__).resolve().parents[1]
 PROVIDERS = {
@@ -61,11 +62,8 @@ def save_preferences(provider, port=None, path=None):
     if provider not in ('codex','claude'):
         raise SourceError('This provider has no quota adapter')
     path = Path(path or ROOT/'.runtime/preferences.json')
-    path.parent.mkdir(parents=True,exist_ok=True)
     data = {'provider':provider,'port':port}
-    tmp = path.with_suffix('.tmp')
-    tmp.write_text(json.dumps(data,indent=2)+'\n',encoding='utf-8')
-    tmp.replace(path)
+    atomic_write(path,(json.dumps(data,indent=2)+'\n').encode('utf-8'))
 
 def start_monitor(provider, port=None):
     # A fixed local script owns background startup and the duplicate-process guard.
