@@ -85,7 +85,7 @@ Closing setup **leaves the monitor running with its notification icon** while th
 
 For normal use after setup, double-click [`Start Quota Orb.cmd`](../Start%20Quota%20Orb.cmd). It starts monitoring with saved preferences and opens the branded **Quota Orb | Display studio** window, which has its own taskbar button. If monitoring is already running, the launcher opens or focuses the existing live window without creating a second monitor or USB owner. [`Start Codex Peek.cmd`](../Start%20Codex%20Peek.cmd) provides the older launch name and explicitly selects Codex for a new monitor; it opens the same Quota Orb window. Stop an existing monitor before changing provider.
 
-**Upgrading an old Codex Peek copy:** stop it with the stop command from that old copy, then start the launcher inside the newly extracted release. An older launcher can still run its older hidden implementation; downloading a new release does not update another extracted folder or its shortcuts. `Run Quota Orb.cmd` opens the setup wizard.
+**Upgrading an older Codex Peek or Quota Orb copy:** stop it with the stop command from that old copy, then start the launcher inside the newly extracted release. An older launcher can still run its older implementation; downloading a new release does not update another extracted folder or its shortcuts. If a running monitor predates desktop launch requests, the new Start launcher asks you to stop and restart it before opening a window. `Run Quota Orb.cmd` opens the setup wizard.
 
 | Icon / control | Meaning |
 |---|---|

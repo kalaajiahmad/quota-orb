@@ -1,3 +1,4 @@
+import gc
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import tkinter as tk
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
+import weakref
 import zlib
 
 from bridge.display import LiveDisplay
@@ -25,8 +27,17 @@ class DesktopTests(unittest.TestCase):
         self.root.withdraw()
 
     def tearDown(self):
-        self.root.destroy()
-        self.directory.cleanup()
+        root_reference = weakref.ref(self.root)
+        try:
+            self.root.destroy()
+        finally:
+            self.root = None
+            # Tk controllers, callbacks, images and variables form Python cycles.
+            # Finalize them on the thread that created Tcl, before a later
+            # subprocess pipe-reader thread can trigger automatic collection.
+            gc.collect()
+            self.directory.cleanup()
+        self.assertIsNone(root_reference(), 'Desktop test retained its Tk interpreter owner')
 
     def editor(self):
         editor = Studio(self.root,self.runtime)

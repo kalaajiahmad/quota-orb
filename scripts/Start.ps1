@@ -44,7 +44,12 @@ while ((Get-Date) -lt $deadline) {
                 (Get-Process -Id $status.pid -ErrorAction SilentlyContinue)) { $ready = $true }
         } catch { } # Atomic replacement can coincide with this read; retry.
     }
-    if ($ready) { break }
+    if ($ready) {
+        if ($ShowWindow -and $status.desktop_request_version -ne 1) {
+            throw 'The running monitor predates desktop launch requests. Run Stop Quota Orb.cmd, then start again from this release.'
+        }
+        break
+    }
     Start-Sleep -Milliseconds 250
 }
 if (-not $ready) {

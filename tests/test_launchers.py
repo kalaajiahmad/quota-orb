@@ -42,7 +42,7 @@ function Start-Process {
                 style=$WindowStyle; stdout=$RedirectStandardOutput; stderr=$RedirectStandardError}
     $record | ConvertTo-Json -Compress | Add-Content -LiteralPath (Join-Path $PSScriptRoot 'launches.jsonl')
     if ($env:QUOTA_ORB_TEST_NEW_STATUS -eq '1') {
-        @{running=$true; tray_registered=$true; pid=[int]$env:QUOTA_ORB_TEST_PID;
+        @{running=$true; tray_registered=$true; desktop_request_version=1; pid=[int]$env:QUOTA_ORB_TEST_PID;
           updated_at=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()/1000.0} |
             ConvertTo-Json | Set-Content -LiteralPath (Join-Path $PSScriptRoot '.runtime/status.json')
     }
@@ -74,7 +74,8 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 
     def status(self, **changes):
         self.runtime.mkdir(exist_ok=True)
-        record = dict(running=True, tray_registered=True, pid=os.getpid(), updated_at=time.time())
+        record = dict(running=True, tray_registered=True, desktop_request_version=1,
+                      pid=os.getpid(), updated_at=time.time())
         record.update(changes)
         (self.runtime/'status.json').write_text(json.dumps(record), encoding='utf-8')
 
@@ -107,6 +108,18 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse((self.runtime/'open-display').exists())
         self.assertEqual(self.launches(), [])
+
+    def test_older_monitor_requires_restart_before_requesting_a_window(self):
+        self.hold_mutex()
+        self.status(desktop_request_version=None)
+        result = self.start('-ShowWindow')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Run Stop Quota Orb.cmd', result.stderr)
+        self.assertFalse((self.runtime/'open-display').exists())
+        self.assertFalse((self.runtime/'stop').exists())
+        self.assertEqual(self.launches(), [])
+        result = self.start()
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_unhealthy_existing_monitor_cannot_report_success_or_request_a_window(self):
         self.hold_mutex()

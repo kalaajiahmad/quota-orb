@@ -248,6 +248,7 @@ def main():
                     next_connect = time.monotonic() + 3
             save_png(args.output, frame)
             status = {"pid": os.getpid(), "running": True, "updated_at": now,
+                "desktop_request_version": 1,
                 "provider": args.provider,
                 "source": ('PAUSED' if session.paused else 'RESUMING' if session.transitioning else
                     freshness(snapshot, now, error is not None, max(150, args.poll * 2.5))),
