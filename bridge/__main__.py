@@ -183,6 +183,15 @@ def main():
             tick_start = time.monotonic()
             if stop_file.exists() or args.duration and tick_start - first >= args.duration:
                 break
+            open_display = args.runtime / 'open-display'
+            try:
+                open_display.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logging.warning('Desktop request is busy; retrying next frame')
+            else:
+                commands.put('display')
             while not commands.empty():
                 command = commands.get_nowait()
                 if command == 'quit':
@@ -273,6 +282,10 @@ def main():
             atomic_json(status_path, stopped)
         (args.runtime / "process.json").unlink(missing_ok=True)
         stop_file.unlink(missing_ok=True)
+        try:
+            (args.runtime / 'open-display').unlink(missing_ok=True)
+        except OSError:
+            logging.warning('Could not clear the desktop request during shutdown')
         if mutex:
             kernel.CloseHandle.argtypes = [ctypes.c_void_p]
             kernel.CloseHandle(mutex)

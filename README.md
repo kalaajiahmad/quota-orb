@@ -100,7 +100,9 @@ The launcher prepares a local Python environment and opens a four-step desktop w
 
 **[Follow the complete setup guide →](docs/SETUP.md)** — every button, provider limitations, firmware backup/upload, troubleshooting, and where sensitive data stays.
 
-**Visible while running.** Quota Orb lives in the Windows notification area beside the clock (or under its overflow arrow). Its status dot shows live, waiting, error, or paused state. **Click for a live OLED mirror**; right-click for **Setup · Status · Pause/Resume · Quit**. Closing setup keeps the icon visible. Quit stops the monitor and removes it. Login startup is off by default; no service or scheduled task is installed. If icon registration fails, monitoring does not start. [Controls and process details →](docs/SETUP.md#5-start-and-check-the-result)
+**Visible when you start it.** After setup, double-click [`Start Quota Orb.cmd`](Start%20Quota%20Orb.cmd) to start monitoring and open the branded live OLED mirror, with a Quota Orb button on the Windows taskbar. Launching it again brings the existing window forward. [`Start Codex Peek.cmd`](Start%20Codex%20Peek.cmd) is a compatibility shortcut that selects Codex for a new monitor and opens the same app. When upgrading an older Codex Peek copy, stop that copy first and use the launcher from the newly extracted release. [Complete upgrade and launcher guide →](docs/SETUP.md#5-start-and-check-the-result)
+
+The notification icon remains beside the clock or under Windows' overflow arrow. Its status dot shows live, waiting, error, or paused state. **Click for the live mirror**; right-click for **Setup · Status · Pause/Resume · Quit**. Closing the desktop window keeps monitoring and its tray icon running; Quit stops both. Windows controls tray placement. Login startup is off by default; no service or scheduled task is installed. If icon registration fails, monitoring does not start. Task Manager's **Details** tab shows `pythonw.exe`; the command line identifies `-m bridge` or `-m bridge.display`. The app's taskbar identity does not rename its Python executable. [Controls and process details →](docs/SETUP.md#5-start-and-check-the-result)
 
 ### Your pixels. Your dashboard.
 
@@ -131,7 +133,7 @@ The rounded enclosure has a copper-colour accent, a removable rear cover, a slid
 
 ## Validation and limits
 
-Local validation passed 57 checks covering quota parsing, freshness, transport, failure recovery, credential-free login dispatch, event sanitization, tray lifecycle, pixel-exact mirroring, layout validation/rapid-save recovery, Windows file-sharing recovery, widget clipping, desktop editing, one-window navigation, and Windows app identity. The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
+The v1.1.1 local validation passed 57 checks covering quota parsing, freshness, transport, failure recovery, credential-free login dispatch, event sanitization, tray lifecycle, pixel-exact mirroring, layout validation/rapid-save recovery, Windows file-sharing recovery, widget clipping, desktop editing, one-window navigation, and Windows app identity. Current release results are recorded in [verification scope](docs/VERIFICATION.md). The original hardware prototype passed USB acknowledgement, CRC rejection, parser recovery, watchdog and reconnect checks. The physical OLED was checked as readable and upright.
 
 The enclosure builder asserts valid solids, manifold meshes, nominal PCB/header/fastener clearances, and left-side USB access. The print plate has been sliced with supports disabled. These checks do not prove physical fit, thermal performance, or cable stability. See [verification scope](docs/VERIFICATION.md).
 
