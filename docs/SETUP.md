@@ -83,6 +83,10 @@ The display shows the selected provider, remaining percentage, reported window, 
 
 Closing setup **leaves the monitor running with its notification icon** while the PC is awake. Look beside the clock or under the **taskbar overflow arrow**. Windows controls this placement; drag the icon onto the taskbar or enable it in Windows taskbar settings if you want it always visible. Quota Orb does not change those preferences.
 
+For normal use after setup, double-click [`Start Quota Orb.cmd`](../Start%20Quota%20Orb.cmd). It starts monitoring with saved preferences and opens the branded **Quota Orb | Display studio** window, which has its own taskbar button. If monitoring is already running, the launcher opens or focuses the existing live window without creating a second monitor or USB owner. [`Start Codex Peek.cmd`](../Start%20Codex%20Peek.cmd) provides the older launch name and explicitly selects Codex for a new monitor; it opens the same Quota Orb window. Stop an existing monitor before changing provider.
+
+**Upgrading an older Codex Peek or Quota Orb copy:** stop it with the stop command from that old copy, then start the launcher inside the newly extracted release. An older launcher can still run its older implementation; downloading a new release does not update another extracted folder or its shortcuts. If a running monitor predates desktop launch requests, the new Start launcher asks you to stop and restart it before opening a window. `Run Quota Orb.cmd` opens the setup wizard.
+
 | Icon / control | Meaning |
 |---|---|
 | Green status dot | Live provider data and connected USB |
@@ -100,11 +104,13 @@ An in-flight provider request may need time to finish. The icon shows **Pausing*
 
 The live window reads the atomic local status record every 200 ms and displays only frames whose sequence/CRC were acknowledged by the board. OLED frames update at 1 Hz. **1×** maps one OLED pixel to one image pixel; **2×/4×/6×** enlarge without smoothing. If USB disconnects or monitoring pauses, the last confirmed frame remains clearly labeled; the board can independently show its offline watchdog screen. Brightness and the board's hardware rotation are panel settings, not framebuffer pixels, and are not reproduced by the mirror. Closing the live window leaves monitoring and its icon running. Quit closes the mirror after monitor shutdown.
 
-**Stop monitor** and `Stop Quota Orb.cmd` also stop the monitor and remove its icon. A named mutex prevents duplicate monitors. If Windows refuses icon registration or the icon thread fails, monitoring stops. There is no icon-free background fallback. Task Manager shows the local environment's `pythonw.exe` monitor and, for Codex, its owned `codex.exe app-server` child; the process command line includes `-m bridge`. No Windows service or scheduled task is installed.
+**Stop monitor**, [`Stop Quota Orb.cmd`](../Stop%20Quota%20Orb.cmd), and [`Stop Codex Peek.cmd`](../Stop%20Codex%20Peek.cmd) stop this copy's monitor and remove its icon. A named mutex prevents duplicate monitors. If Windows refuses icon registration or the icon thread fails, monitoring stops. There is no icon-free background fallback.
+
+In **Task Manager → Details**, enable the **Command line** column to distinguish the local environment's `pythonw.exe` processes: the monitor runs `-m bridge`, and the live window runs `-m bridge.display`. Codex monitoring also owns a `codex.exe app-server` child. A branded taskbar icon and Windows app identity do not rename the executable to `Quota Orb.exe` or `Codex Peek.exe`. No Windows service or scheduled task is installed.
 
 To change provider/account/board, stop, update the provider's official client if needed, then repeat account and USB checks.
 
-For subsequent use, `Run Quota Orb.cmd` reopens the wizard; `Start Quota Orb.cmd` starts directly using saved preferences. **Login startup is off by default**. Advanced users can run `scripts/Enable-Startup.ps1` to create a launcher in their own Startup folder, or `scripts/Disable-Startup.ps1` to remove it. The project must remain in its chosen location.
+**Login startup is off by default**. Advanced users can run `scripts/Enable-Startup.ps1` to create a launcher in their own Startup folder, or `scripts/Disable-Startup.ps1` to remove it. Optional login startup opens only the notification-area monitor; open its live window from the icon when needed. The project must remain in its chosen location.
 
 | PRG press, applied on release | Action |
 |---|---|
@@ -143,7 +149,9 @@ Community widgets are reviewed source changes, with a small drawing API and requ
 |---|---|
 | Launcher reports missing Python/Tk | Install Python 3.10+ with Tcl/Tk and PATH enabled; reopen the terminal |
 | Dependency installation fails | Check internet/proxy access to PyPI; rerun the launcher |
-| Cannot find the running icon | Check the taskbar overflow arrow; reopen setup to inspect status. Start fails if Windows cannot register an icon |
+| No taskbar window after starting | Use `Start Quota Orb.cmd` or the included `Start Codex Peek.cmd` from the current extracted release. Stop an older Codex Peek copy first; its old launcher may still run hidden |
+| Cannot find the running notification icon | Check the taskbar overflow arrow; rerun the current Start launcher to open the live window. Start fails if Windows cannot register an icon |
+| Cannot find Quota Orb in Task Manager | Use Details and enable Command line; look for `pythonw.exe` with `-m bridge` or `-m bridge.display` |
 | Icon is grey / board is offline | Resume monitoring from the icon's right-click menu; pausing intentionally stops frames |
 | Provider CLI missing | Use the official installation link, install its native CLI, reopen the wizard |
 | Browser signed in but quota check fails | Complete the official CLI sign-in; browser authentication alone is insufficient |
@@ -164,11 +172,15 @@ Quota Orb does not automatically chain arbitrary shell commands. To preserve a c
 
 ```powershell
 .\scripts\Setup.ps1             # includes PlatformIO and firmware build
-.\scripts\Start.ps1 -Provider codex
+.\scripts\Start.ps1 -Provider codex -ShowWindow  # monitor and live desktop window
 .\scripts\Stop.ps1
 # Claude, after its status-line integration is installed:
-.\scripts\Start.ps1 -Provider claude
+.\scripts\Start.ps1 -Provider claude -ShowWindow
+# Notification-area monitor only (no live desktop window):
+.\scripts\Start.ps1 -Provider codex
 ```
+
+`Start Quota Orb.cmd` passes `-ShowWindow`; `Start Codex Peek.cmd` passes `-Provider codex -ShowWindow`. Calling `scripts/Start.ps1` directly without `-ShowWindow` preserves notification-area-only startup. Repeating a start with `-ShowWindow` opens or focuses the current display window.
 
 To build manually: `python -m platformio run` in the project environment. Runtime-only dependencies are in `requirements-bridge.txt`; firmware build dependencies are in `requirements.txt`. The ignored local `tooling/` folder is for development only and is not required or distributed.
 
