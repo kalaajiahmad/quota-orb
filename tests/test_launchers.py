@@ -16,6 +16,11 @@ ROOT = Path(__file__).resolve().parents[1]
 POWERSHELL = shutil.which('powershell.exe')
 
 
+class LauncherInventoryTests(unittest.TestCase):
+    def test_only_one_root_windows_launcher(self):
+        self.assertEqual([path.name for path in ROOT.glob('*.cmd')], ['Run Quota Orb.cmd'])
+
+
 @unittest.skipUnless(os.name == 'nt' and POWERSHELL, 'Windows PowerShell launchers')
 class WindowsLauncherTests(unittest.TestCase):
     def setUp(self):
@@ -114,7 +119,7 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
         self.status(desktop_request_version=None)
         result = self.start('-ShowWindow')
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Run Stop Quota Orb.cmd', result.stderr)
+        self.assertIn('Quit the old monitor from its notification icon', result.stderr)
         self.assertFalse((self.runtime/'open-display').exists())
         self.assertFalse((self.runtime/'stop').exists())
         self.assertEqual(self.launches(), [])
@@ -160,7 +165,7 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
         self.assertFalse(self.runtime.exists())
         self.assertEqual(self.launches(), [])
 
-    def test_cmd_entry_points_forward_to_the_intended_script_and_flags(self):
+    def test_canonical_launcher_forwards_to_setup_script(self):
         capture = self.root/'capture.ps1'
         capture.write_text("ConvertTo-Json -InputObject @($args) | Set-Content -LiteralPath "
                            "(Join-Path $PSScriptRoot 'arguments.json')", encoding='utf-8')
@@ -168,9 +173,7 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
             '@echo off\n'+f'"{POWERSHELL}" -NoProfile -ExecutionPolicy Bypass '
             '-File "%~dp0capture.ps1" %*\n', encoding='utf-8')
         for name, script, flags in (
-                ('Start Quota Orb.cmd', 'Start.ps1', ['-ShowWindow']),
-                ('Start Codex Peek.cmd', 'Start.ps1', ['-Provider','codex','-ShowWindow']),
-                ('Stop Codex Peek.cmd', 'Stop.ps1', [])):
+                ('Run Quota Orb.cmd', 'Launch.ps1', []),):
             with self.subTest(name=name):
                 source = (ROOT/name).read_text(encoding='utf-8')
                 # Replace only the external executable; exercise cmd's real quoting and forwarding.

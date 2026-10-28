@@ -1,14 +1,20 @@
 # Setup: from download to desk
 
-The guided app supports **Windows**, **Python 3.10+ with Tcl/Tk**, and the **Heltec WiFi Kit 32 V2, classic ESP32, 8 MB flash, 128×64 OLED**. Other board revisions and capacities need a separately verified firmware target. A ChatGPT/Claude/Gemini browser session does not, by itself, connect a local CLI.
+The app requires **Python 3.10+ with Tcl/Tk** and supports the **Heltec WiFi Kit 32 V2, classic ESP32, 8 MB flash, 128×64 OLED**. Other board revisions and capacities need a separately verified firmware target. A ChatGPT/Claude/Gemini browser session does not, by itself, connect a local CLI.
 
 ## 1. Download and launch
 
-Download this repository's ZIP and extract it, or clone it using Git. Keep it in a folder where the current Windows user can create files. Install Python from [python.org](https://www.python.org/downloads/windows/) with **Tcl/Tk** and **Add Python to PATH** enabled. Restart the terminal after installing Python.
+Download this repository's ZIP and extract it, or clone it using Git. Keep it in a folder where your user can create files. Install Python 3.10+ with Tcl/Tk and ensure it is on PATH. On Linux, your distribution may package Tk and venv separately.
 
-Double-click **`Run Quota Orb.cmd`**. On first launch it creates a local `.venv` and installs the pinned serial dependency from PyPI. It then opens the local desktop wizard. Later launches reuse that environment. No administrator access, cloud account for Quota Orb, or web server is required. An internet connection is needed for first-time dependencies, provider installation/sign-in, and quota reads.
+On Windows, double-click **`Run Quota Orb.cmd`**. On macOS or Linux, open a terminal in the extracted folder and run:
 
-If Windows blocks an untrusted downloaded file, inspect its source and use Windows' normal trust/unblock workflow. Do not disable Windows security protections.
+```sh
+sh scripts/launch.sh
+```
+
+The launcher creates a local `.venv` when needed and installs the pinned runtime dependencies. The first launch opens setup. After you complete setup, the same launcher starts the monitor and opens or focuses the desktop display. An internet connection is needed for first-time dependencies, provider installation/sign-in, and quota reads. No Quota Orb cloud account or web server is required.
+
+macOS and Linux paths have not yet been verified on physical machines; serial permissions and window behavior depend on the operating system and desktop environment. The guided firmware installer currently supports Windows only. On Windows, inspect the source and use the normal trust/unblock workflow if a downloaded launcher is blocked.
 
 ## 2. Choose a provider
 
@@ -20,7 +26,7 @@ The wizard lists provider capability explicitly:
 | **Claude Code** | Official Claude Code sign-in + opt-in local status line | Experimental five-hour/weekly quota events, when the CLI supplies them |
 | **Gemini** | No connection enabled | No verified read-only account-quota adapter in this release |
 
-**Install provider CLI** opens the provider's official installation documentation. Install its trusted native Windows CLI, then reopen the wizard if PATH changed. Quota Orb does not download or install an AI client for you. It detects Codex on PATH or in the desktop app's usual local bin folder; Claude Code must be the native `.exe` on PATH or in its usual local bin folder.
+**Install provider CLI** opens the provider's official installation documentation. Install its trusted native CLI for your operating system, then reopen the wizard if PATH changed. Quota Orb does not download or install an AI client for you. It detects Codex on PATH or in the desktop app's usual local bin folder; Claude Code must be installed as a native executable on PATH or in its usual local bin folder.
 
 **Preview demo** shows synthetic output without an account or a board. It never signs in, contacts a model, or opens USB.
 
@@ -52,13 +58,13 @@ Claude updates are **event-driven**. A recent event does not prove a new server 
 
 The wizard labels Gemini **unavailable** and starts no login or model request for it. Successful Google sign-in alone would not establish reliable remaining account quota. Gemini's interactive statistics and token usage should not be presented as verified remaining allowance. A supported adapter is future work.
 
-## 4. Connect and prepare the board
+## 4. Connect and prepare the board (optional)
 
-Connect the Heltec through a **micro USB data cable**. Click **Find board**, select the correct CP210x serial port, then click **Check USB**. Install the Silicon Labs CP210x driver if Windows does not expose a serial port. With several CP210x devices, verify the physical board before selecting one. A CP210x adapter alone does not identify its board revision.
+Skip this section for desktop-only use. To use the physical OLED, connect the Heltec through a **micro USB data cable**. Click **Find board**, select the correct CP210x serial port, then click **Check USB**. Install the Silicon Labs CP210x driver if Windows does not expose a serial port. With several CP210x devices, verify the physical board before selecting one. A CP210x adapter alone does not identify its board revision.
 
 **Check USB** performs the Quota Orb firmware handshake and checks that the OLED acknowledged on I2C. It does not flash the board. Stop any running monitor before checking the port. A successful handshake does not prove the physical pixels are upright; inspect the actual OLED.
 
-If the board needs Quota Orb firmware, click **Install V2 firmware**:
+On Windows, if the board needs Quota Orb firmware, click **Install V2 firmware**. Guided installation is Windows-only:
 
 1. Confirm that the connected board is the specified V2/8 MB target. The installer runs in a visible console.
 2. It stops this project's monitor, installs the pinned PlatformIO build dependencies, and compiles firmware.
@@ -77,15 +83,17 @@ Flashing replaces the previous firmware. Keep the backup private: old firmware c
 
 ## 5. Start and check the result
 
-Once **quota access** and **USB** are verified, click **Start monitor**. The wizard saves only the selected provider and serial port under ignored `.runtime/` preferences. It starts a **visible notification-area app** and shows source state, USB state, and acknowledged frame count. Start confirms that the icon registered with Windows. To verify the board is working, wait for the acknowledged count to increase and check the OLED.
+Once **quota access** is verified, click **Start monitor**. USB verification is required only when a board is selected. The wizard saves the selected provider and optional serial port under ignored `.runtime/` preferences. On Windows, the monitor registers a notification icon. If using the board, wait for the acknowledged frame count to increase and check the OLED.
 
 The display shows the selected provider, remaining percentage, reported window, reset countdown, and freshness. Codex polls every 60 seconds; the OLED redraws every second. Claude follows status-line events. Both retain a last good reading as **STALE** on failures. Expired reset timers wait for confirmation rather than inventing replenishment.
 
-Closing setup **leaves the monitor running with its notification icon** while the PC is awake. Look beside the clock or under the **taskbar overflow arrow**. Windows controls this placement; drag the icon onto the taskbar or enable it in Windows taskbar settings if you want it always visible. Quota Orb does not change those preferences.
+On Windows, closing setup leaves the monitor running with its notification icon. Look beside the clock or under the taskbar overflow arrow. Windows controls its placement. On macOS and Linux, there is no notification icon: use the app window to manage the monitor. Closing the last display/widget window stops it.
 
-For normal use after setup, double-click [`Start Quota Orb.cmd`](../Start%20Quota%20Orb.cmd). It starts monitoring with saved preferences and opens the branded **Quota Orb | Display studio** window, which has its own taskbar button. If monitoring is already running, the launcher opens or focuses the existing live window without creating a second monitor or USB owner. [`Start Codex Peek.cmd`](../Start%20Codex%20Peek.cmd) provides the older launch name and explicitly selects Codex for a new monitor; it opens the same Quota Orb window. Stop an existing monitor before changing provider.
+For normal use after setup, use the same launcher from step 1. It starts monitoring with saved preferences and opens the live display. If the monitor is already running, it opens or focuses the existing display without creating another monitor. To change provider or board, stop monitoring and open setup from the application.
 
-**Upgrading an older Codex Peek or Quota Orb copy:** stop it with the stop command from that old copy, then start the launcher inside the newly extracted release. An older launcher can still run its older implementation; downloading a new release does not update another extracted folder or its shortcuts. If a running monitor predates desktop launch requests, the new Start launcher asks you to stop and restart it before opening a window. `Run Quota Orb.cmd` opens the setup wizard.
+**Upgrading an older Codex Peek or Quota Orb copy:** stop the old copy, then use the launcher inside the new release. Older extracted folders remain separate installations. Quit the old monitor using its notification icon before opening the new copy.
+
+On Windows, the notification icon controls are:
 
 | Icon / control | Meaning |
 |---|---|
@@ -102,13 +110,13 @@ For normal use after setup, double-click [`Start Quota Orb.cmd`](../Start%20Quot
 
 An in-flight provider request may need time to finish. The icon shows **Pausing** or **Stopping** during cleanup; allow up to 40 seconds. The board shows **USB OFFLINE** within six seconds of frame updates stopping. Claude's separately configured status line remains active in Claude Code after Pause/Quit: use **Remove Claude link** in setup to stop that event cache. Quitting the monitor does not log out of a provider or close its independently opened windows.
 
-The live window reads the atomic local status record every 200 ms and displays only frames whose sequence/CRC were acknowledged by the board. OLED frames update at 1 Hz. **1×** maps one OLED pixel to one image pixel; **2×/4×/6×** enlarge without smoothing. If USB disconnects or monitoring pauses, the last confirmed frame remains clearly labeled; the board can independently show its offline watchdog screen. Brightness and the board's hardware rotation are panel settings, not framebuffer pixels, and are not reproduced by the mirror. Closing the live window leaves monitoring and its icon running. Quit closes the mirror after monitor shutdown.
+The live window reads the atomic local status record every 200 ms and displays only frames whose sequence/CRC were acknowledged by the board. OLED frames update at 1 Hz. **1×** maps one OLED pixel to one image pixel; **2×/4×/6×** enlarge without smoothing. If USB disconnects or monitoring pauses, the last confirmed frame remains clearly labeled; the board can independently show its offline watchdog screen. Brightness and the board's hardware rotation are panel settings, not framebuffer pixels, and are not reproduced by the mirror. On Windows, closing the live window leaves monitoring and its icon running; Quit closes the mirror after shutdown. On macOS and Linux, closing the last display/widget window stops the monitor.
 
-**Stop monitor**, [`Stop Quota Orb.cmd`](../Stop%20Quota%20Orb.cmd), and [`Stop Codex Peek.cmd`](../Stop%20Codex%20Peek.cmd) stop this copy's monitor and remove its icon. A named mutex prevents duplicate monitors. If Windows refuses icon registration or the icon thread fails, monitoring stops. There is no icon-free background fallback.
+On Windows, **Quit Quota Orb** from the notification menu stops the monitor. If Windows refuses icon registration or the icon thread fails, monitoring stops. On macOS and Linux, close the last display/widget window or use **Stop monitor** in setup.
 
 In **Task Manager → Details**, enable the **Command line** column to distinguish the local environment's `pythonw.exe` processes: the monitor runs `-m bridge`, and the live window runs `-m bridge.display`. Codex monitoring also owns a `codex.exe app-server` child. A branded taskbar icon and Windows app identity do not rename the executable to `Quota Orb.exe` or `Codex Peek.exe`. No Windows service or scheduled task is installed.
 
-To change provider/account/board, stop, update the provider's official client if needed, then repeat account and USB checks.
+To change provider/account/board, stop, update the provider's official client if needed, then repeat the account check and, if using a board, the USB check.
 
 **Login startup is off by default**. Advanced users can run `scripts/Enable-Startup.ps1` to create a launcher in their own Startup folder, or `scripts/Disable-Startup.ps1` to remove it. Optional login startup opens only the notification-area monitor; open its live window from the icon when needed. The project must remain in its chosen location.
 
@@ -120,9 +128,13 @@ To change provider/account/board, stop, update the provider's official client if
 
 Do not hold PRG during reset/connection: it selects the ESP32 bootloader. Display settings reset after power loss.
 
-## 6. Design your OLED
+## 6. Add a desktop widget
 
-1. Click the notification icon to open the live display, then choose **Edit layout**. The **same window** transitions into Design with the active custom layout or a starter arrangement. **← Live display** switches back; your draft remains intact across view changes. Its preview is explicitly **simulated draft data**; it does not request account usage or send frames while you edit. Windows identifies the app as Quota Orb with its own icon rather than grouping its window under Python.
+In the display window, click **Add widget**. A compact movable application window shows the locally rendered quota frame and its source state, even without a connected board. Its position and enabled state are saved locally and it reopens when you next open the display. Close the widget to disable it; use **Add widget** again to restore it. If the main display is closed while the widget is open, it stays available. This is an app window rather than a native macOS, Windows, or Linux widget panel integration.
+
+## 7. Design your OLED
+
+1. Open the live display, then choose **Edit layout**. The **same window** transitions into Design with the active custom layout or a starter arrangement. **← Live display** switches back; your draft remains intact across view changes. Its preview is explicitly **simulated draft data**; it does not request account usage or send frames while you edit. Windows identifies the app as Quota Orb with its own icon rather than grouping its window under Python.
 2. Drag a widget from the palette onto the canvas, or double-click its palette card to place it. Select an existing widget and drag to move it. Movement follows the pointer, then snaps to a **2 px position grid** on release. Enter exact integer **X / Y / width / height** in the inspector and choose **Update size / position** for precise placement.
 3. Add **Custom text** and use **Update text** to change its label. Text uses the OLED's original 5×7 alphabet and clips at its widget bounds. Remove components or **Undo** changes. The renderer clips every widget to its own rectangle.
 4. Keep exactly one **Source status** widget. All widgets must fit inside **128×64** without overlap. Invalid drafts show a reason and disable **Apply to OLED**. This prevents a large reading from hiding freshness/error state.
@@ -149,8 +161,8 @@ Community widgets are reviewed source changes, with a small drawing API and requ
 |---|---|
 | Launcher reports missing Python/Tk | Install Python 3.10+ with Tcl/Tk and PATH enabled; reopen the terminal |
 | Dependency installation fails | Check internet/proxy access to PyPI; rerun the launcher |
-| No taskbar window after starting | Use `Start Quota Orb.cmd` or the included `Start Codex Peek.cmd` from the current extracted release. Stop an older Codex Peek copy first; its old launcher may still run hidden |
-| Cannot find the running notification icon | Check the taskbar overflow arrow; rerun the current Start launcher to open the live window. Start fails if Windows cannot register an icon |
+| No taskbar window after starting | Use `Run Quota Orb.cmd` from the current extracted release. Stop an older Codex Peek copy first; its old launcher may still run hidden |
+| Cannot find the running notification icon | Check the taskbar overflow arrow; rerun the current launcher to open the live window. Start fails if Windows cannot register an icon |
 | Cannot find Quota Orb in Task Manager | Use Details and enable Command line; look for `pythonw.exe` with `-m bridge` or `-m bridge.display` |
 | Icon is grey / board is offline | Resume monitoring from the icon's right-click menu; pausing intentionally stops frames |
 | Provider CLI missing | Use the official installation link, install its native CLI, reopen the wizard |
@@ -166,23 +178,11 @@ Community widgets are reviewed source changes, with a small drawing API and requ
 
 ### Existing Claude status line
 
-Quota Orb does not automatically chain arbitrary shell commands. To preserve a custom status line, an experienced user can adapt that script to send the same stdin JSON to `scripts/Claude-Statusline.ps1` while keeping the original stdout. Do not write the raw JSON to disk or forward it to a network service. Alternatively, remove the existing status line yourself before opting into Quota Orb's integration. No existing configuration is overwritten automatically.
+Quota Orb does not automatically chain arbitrary shell commands. To preserve a custom status line, an experienced user can adapt that script to send the same stdin JSON to the Quota Orb status-line command while keeping the original stdout. Do not write the raw JSON to disk or forward it to a network service. Alternatively, remove the existing status line yourself before opting into Quota Orb's integration. No existing configuration is overwritten automatically.
 
-## Advanced command line
+## Advanced development
 
-```powershell
-.\scripts\Setup.ps1             # includes PlatformIO and firmware build
-.\scripts\Start.ps1 -Provider codex -ShowWindow  # monitor and live desktop window
-.\scripts\Stop.ps1
-# Claude, after its status-line integration is installed:
-.\scripts\Start.ps1 -Provider claude -ShowWindow
-# Notification-area monitor only (no live desktop window):
-.\scripts\Start.ps1 -Provider codex
-```
-
-`Start Quota Orb.cmd` passes `-ShowWindow`; `Start Codex Peek.cmd` passes `-Provider codex -ShowWindow`. Calling `scripts/Start.ps1` directly without `-ShowWindow` preserves notification-area-only startup. Repeating a start with `-ShowWindow` opens or focuses the current display window.
-
-To build manually: `python -m platformio run` in the project environment. Runtime-only dependencies are in `requirements-bridge.txt`; firmware build dependencies are in `requirements.txt`. The ignored local `tooling/` folder is for development only and is not required or distributed.
+Run the automated tests from the project environment with `python -m unittest discover -s tests -v`. The firmware build uses `python -m platformio run` with the dependencies in `requirements.txt`. Runtime dependencies are listed separately in `requirements-bridge.txt`.
 
 ## Official interface references
 

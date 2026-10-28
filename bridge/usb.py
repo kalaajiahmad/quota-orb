@@ -12,7 +12,7 @@ def discover_port():
         return ports[0]
     if not ports:
         raise OSError("No CP210x USB adapter found; reconnect the Heltec USB data cable")
-    raise OSError("Several CP210x adapters found; select the Heltec with --port COMx")
+    raise OSError("Several CP210x adapters found; select the Heltec's serial port")
 
 
 def packet(frame, sequence):

@@ -12,6 +12,7 @@ import weakref
 import zlib
 
 from bridge.display import LiveDisplay
+from bridge.desktop_widget import load_preferences, rendered_pixels, widget_status
 from bridge.layout import load, save, starter
 from bridge.studio import Studio, SCALE
 from bridge.ui import MotionButton, windows_app_identity, APP_ID
@@ -134,6 +135,54 @@ class DesktopTests(unittest.TestCase):
         self.assertIs(view.studio,editor)
         self.assertEqual(json.dumps(editor.layout),draft)
         self.assertFalse(any(isinstance(child,tk.Toplevel) for child in self.root.winfo_children()))
+
+    def test_widget_remains_visible_after_main_window_closes_and_can_be_removed(self):
+        view = LiveDisplay(self.root,self.runtime)
+        self.root.withdraw()
+        view.add_widget()
+        self.assertTrue(load_preferences(self.runtime)['enabled'])
+        frame = bytes([1])+bytes(1023)
+        view.widget.update({'running':True,'updated_at':time.time(),'source':'LIVE'},frame)
+        self.assertEqual(view.widget.image.get(0,0),(220,249,240))
+        view.close_window()
+        self.assertEqual(self.root.state(),'withdrawn')
+        self.assertTrue(view.widget.window.winfo_exists())
+        # Keep the root alive for the fixture's teardown while checking removal.
+        self.root.deiconify()
+        view.widget.close()
+        self.assertIsNone(view.widget)
+        self.assertFalse(load_preferences(self.runtime)['enabled'])
+
+    def test_widget_restores_enabled_preference(self):
+        (self.runtime/'desktop-widget.json').write_text('{"enabled": true, "x": 100, "y": 120}')
+        view = LiveDisplay(self.root,self.runtime)
+        self.assertIsNotNone(view.widget)
+        self.assertEqual(view.widget.window.winfo_x(),100)
+        self.assertEqual(view.widget.window.winfo_y(),120)
+
+    def test_widget_restores_tk_signed_position(self):
+        view = LiveDisplay(self.root,self.runtime)
+        view.add_widget()
+        window = view.widget.window
+        window.update_idletasks()
+        # Tk's negative position offsets count from the far screen edge.
+        window.geometry(f'-{window.winfo_screenwidth()}-{window.winfo_screenheight()}')
+        window.update_idletasks()
+        view.widget.persist(True)
+        position = load_preferences(self.runtime)['position']
+        window.destroy()
+        view.widget = None
+        view.add_widget()
+        view.widget.window.update_idletasks()
+        self.assertEqual(load_preferences(self.runtime)['position'], position)
+        from bridge.desktop_widget import position_from_geometry
+        self.assertEqual(position_from_geometry(view.widget.window.geometry()), position)
+
+    def test_widget_reports_monitor_staleness_and_rejects_bad_frames(self):
+        self.assertEqual(widget_status({'running':True,'updated_at':10,'source':'LIVE'},20),
+                         'MONITOR NOT RESPONDING')
+        self.assertIsNone(rendered_pixels({'rendered_frame':'00'}))
+        self.assertEqual(rendered_pixels({'rendered_frame':'00'*1024}),bytes(1024))
 
     def test_rapid_view_changes_cancel_previous_animation(self):
         view = LiveDisplay(self.root,self.runtime,demo=True)

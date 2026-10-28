@@ -155,6 +155,17 @@ def main():
             logging.error("A Quota Orb bridge is already running")
             return 1
 
+    lock_file = None
+    if os.name != "nt":
+        import fcntl
+        lock_file = (args.runtime / "bridge.lock").open("a+")
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock_file.close()
+            logging.error("A Quota Orb bridge is already running")
+            return 1
+
     stop = threading.Event()
     def request_stop(*_):
         stop.set()
@@ -201,16 +212,19 @@ def main():
                     if session.paused:
                         display.close()
                 elif command == 'setup' and (setup_window is None or setup_window.poll() is not None):
-                    program = Path(sys.executable).with_name('pythonw.exe')
+                    program = Path(sys.executable).with_name('pythonw.exe') if os.name == 'nt' else sys.executable
                     setup_window = subprocess.Popen([str(program), '-m', 'bridge.onboarding'],
-                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW)
+                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                 elif command == 'display' and (preview_window is None or preview_window.poll() is not None):
-                    program = Path(sys.executable).with_name('pythonw.exe')
+                    program = Path(sys.executable).with_name('pythonw.exe') if os.name == 'nt' else sys.executable
                     preview_window = subprocess.Popen([str(program), '-m', 'bridge.display',
                         '--runtime', str(args.runtime.resolve())],
-                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW)
+                        cwd=Path(__file__).resolve().parents[1], creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
                 elif command == 'display':
                     (args.runtime/'show-display').touch()
+            if os.name != 'nt' and preview_window is not None and preview_window.poll() is not None:
+                logging.info('Desktop window closed; stopping monitor')
+                stop.set()
             if tray and tray.failed.is_set():
                 raise OSError('Notification icon failed; monitoring has stopped')
             if stop.is_set():
@@ -259,6 +273,7 @@ def main():
                 "usb_connected": display.serial is not None, "frames_acknowledged": acks,
                 "last_ack": display.last_ack, "snapshot": asdict(snapshot) if snapshot else None}
             status['display_frame'] = confirmed_frame
+            status['rendered_frame'] = frame.hex()
             status.update(layout_mode=layout_mode, layout_error=layouts.error)
             atomic_json(args.runtime / "status.json", status)
             if tray:
@@ -290,6 +305,8 @@ def main():
         if mutex:
             kernel.CloseHandle.argtypes = [ctypes.c_void_p]
             kernel.CloseHandle(mutex)
+        if lock_file:
+            lock_file.close()
         logging.info("Bridge stopped; firmware will show USB OFFLINE within six seconds")
     return 0
 

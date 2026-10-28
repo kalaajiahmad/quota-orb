@@ -13,5 +13,5 @@ if (-not (Test-Path -LiteralPath $pythonPath)) {
 }
 & $pythonPath -m pip install --disable-pip-version-check -r requirements-bridge.txt
 if ($LASTEXITCODE -ne 0) { throw 'Dependency setup failed. Check the network and retry.' }
-& $pythonPath -m bridge.onboarding
-if ($LASTEXITCODE -ne 0) { throw 'Setup wizard exited with an error.' }
+& $pythonPath -m bridge.launch
+if ($LASTEXITCODE -ne 0) { throw 'Quota Orb exited with an error.' }

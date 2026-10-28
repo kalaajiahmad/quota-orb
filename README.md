@@ -12,7 +12,7 @@
 
 </div>
 
-Quota Orb puts remaining AI allowance, reset time, and data freshness on a 0.96-inch OLED. The **Codex** integration reads subscription limits through its documented local app-server. An experimental **Claude Code** adapter receives documented local quota events. A small Windows bridge handles the account read; the ESP32 receives only display pixels over USB.
+Quota Orb puts remaining AI allowance, reset time, and data freshness on a 0.96-inch OLED. The **Codex** integration reads subscription limits through its documented local app-server. An experimental **Claude Code** adapter receives documented local quota events. A local bridge handles the account read; the ESP32 receives only display pixels over USB.
 
 **Open source, no cloud backend, no WiFi setup, no credentials on the board.** Provider availability is explicit: Codex polling, experimental Claude Code events, and Gemini unavailable pending a verified quota adapter. This is an independent community project, unaffiliated with OpenAI or Heltec.
 
@@ -72,8 +72,8 @@ Allowance is **not** a token counter, spending estimate, or per-token live strea
 
 | Item | Requirement |
 |---|---|
-| Board | Heltec WiFi Kit 32 **V2**, ESP32, 0.96-inch 128×64 OLED |
-| Connection | Micro USB **data** cable to a Windows PC |
+| Board | Optional for the desktop widget; Heltec WiFi Kit 32 **V2**, ESP32, 0.96-inch 128×64 OLED for hardware display |
+| Connection | Micro USB **data** cable to the computer |
 | Account | Eligible provider subscription connected through its official CLI |
 | Printing | PLA, 0.4 mm nozzle; optional enclosure |
 
@@ -81,12 +81,12 @@ V3/S3 boards use different pins and require a separate firmware target. API-key-
 
 ## From download to desk
 
-**Download → Run → Choose provider → Sign in officially → Verify quota → Connect USB → Start.**
+**Download → Run → Choose provider → Sign in officially → Verify quota → Start.** Connect a board if you also want the OLED.
 
-Install **Python 3.10+ with Tcl/Tk** on Windows, extract this repository, then double-click:
+Install **Python 3.10+ with Tcl/Tk** and extract this repository. On Windows, double-click **`Run Quota Orb.cmd`**. On macOS or Linux, run from the extracted folder:
 
-```text
-Run Quota Orb.cmd
+```sh
+sh scripts/launch.sh
 ```
 
 The launcher prepares a local Python environment and opens a four-step desktop wizard. **Preview demo** works immediately without an account or board. **Install provider CLI** opens the official instructions. If already signed into that CLI, **Check connection** reuses it; otherwise **Sign in with provider** opens the vendor-owned browser flow. No token, password, cookie, or API key is pasted into Quota Orb.
@@ -95,16 +95,18 @@ The launcher prepares a local Python environment and opens a four-step desktop w
 |---|---|
 | **1 · Choose provider** | Capability is explicit: Codex available, Claude experimental, Gemini unavailable |
 | **2 · Connect account** | Official sign-in when needed, then a real quota-access check |
-| **3 · Connect Heltec** | Find the USB board and verify firmware/OLED; install firmware if required |
-| **4 · Start monitor** | See the notification icon appear and watch acknowledged frames increase |
+| **3 · Connect Heltec (optional)** | Find the USB board and verify firmware/OLED; install firmware if required |
+| **4 · Start monitor** | Open the display or widget; if using USB, watch acknowledged frames increase |
 
 **[Follow the complete setup guide →](docs/SETUP.md)** — every button, provider limitations, firmware backup/upload, troubleshooting, and where sensitive data stays.
 
-**Visible when you start it.** After setup, double-click [`Start Quota Orb.cmd`](Start%20Quota%20Orb.cmd) to start monitoring and open the branded live OLED mirror, with a Quota Orb button on the Windows taskbar. Launching it again brings the existing window forward. [`Start Codex Peek.cmd`](Start%20Codex%20Peek.cmd) is a compatibility shortcut that selects Codex for a new monitor and opens the same app. When upgrading an older Codex Peek copy, stop that copy first and use the launcher from the newly extracted release. [Complete upgrade and launcher guide →](docs/SETUP.md#5-start-and-check-the-result)
+**Use the same launcher every time.** The first launch opens setup; later launches start the monitor and open or focus the live display using your saved preferences. When upgrading an older copy, quit it first and use the launcher in the new release. [Complete setup and launcher guide →](docs/SETUP.md#5-start-and-check-the-result)
 
-The notification icon remains beside the clock or under Windows' overflow arrow. Its status dot shows live, waiting, error, or paused state. **Click for the live mirror**; right-click for **Setup · Status · Pause/Resume · Quit**. Closing the desktop window keeps monitoring and its tray icon running; Quit stops both. Windows controls tray placement. Login startup is off by default; no service or scheduled task is installed. If icon registration fails, monitoring does not start. Task Manager's **Details** tab shows `pythonw.exe`; the command line identifies `-m bridge` or `-m bridge.display`. The app's taskbar identity does not rename its Python executable. [Controls and process details →](docs/SETUP.md#5-start-and-check-the-result)
+On Windows the notification icon is beside the clock or under the overflow arrow. Click it for the live mirror, or use its menu for setup, status, pause, and quit. Closing the desktop window keeps the monitor running. Login startup is off by default. On macOS and Linux the app uses its desktop window instead of a notification icon; closing the last app window stops the monitor. See the setup guide for platform limitations.
 
 ### Your pixels. Your dashboard.
+
+Choose **Add widget** in the desktop window to open a compact, movable Quota Orb window. It displays the locally rendered quota frame, including without a USB board, and remembers its position and enabled state. Closing the widget disables it; open it again with **Add widget**. This is an application window, not a native OS widget or a replacement for the operating system's widget panel.
 
 ![Three actual renderer outputs with synthetic usage: classic, widget starter, and minimal](assets/widget-layouts.png)
 
@@ -112,7 +114,7 @@ The desktop view displays the **exact 1,024-byte framebuffer acknowledged by the
 
 Open **Edit layout** to switch the same window into Design and arrange ten built-in widgets on a 128×64 canvas: **provider · source status · quota window · remaining % · progress bar · reset · age · animated companion · text · separator**. Drag from the palette, move components, edit dimensions, undo, and **Apply to OLED**. **← Live display** returns to the acknowledged output; switching preserves your draft. The native dark-and-copper interface has rounded controls, eased hover/view transitions, a Quota Orb taskbar identity, and a subtle live-status pulse; animation respects Windows' client-animation preference.
 
-Drafts use labeled simulated data. Applying changes switches the running renderer on its next frame; the live mirror confirms receipt. Layouts are portable, validated JSON with no executable code or account values. Source status stays mandatory, overlaps/out-of-bounds are rejected, and **Use classic display** restores the original view. [Studio guide →](docs/SETUP.md#6-design-your-oled) · [Build a community widget →](docs/WIDGETS.md)
+Drafts use labeled simulated data. Applying changes switches the running renderer on its next frame; the live mirror confirms receipt. Layouts are portable, validated JSON with no executable code or account values. Source status stays mandatory, overlaps/out-of-bounds are rejected, and **Use classic display** restores the original view. [Studio guide →](docs/SETUP.md#7-design-your-oled) · [Build a community widget →](docs/WIDGETS.md)
 
 Codex uses `codex login`. Claude uses `claude auth login` plus an explicitly enabled local status line. Quota Orb never handles provider credentials. Claude quota events depend on an eligible active session; they are not continuous polling. Gemini cannot be connected in this release. A browser chat login alone does not establish a local CLI connection.
 
@@ -137,7 +139,7 @@ The v1.1.1 local validation passed 57 checks covering quota parsing, freshness, 
 
 The enclosure builder asserts valid solids, manifold meshes, nominal PCB/header/fastener clearances, and left-side USB access. The print plate has been sliced with supports disabled. These checks do not prove physical fit, thermal performance, or cable stability. See [verification scope](docs/VERIFICATION.md).
 
-The public tree is focused on running, flashing, and maintaining this target. Reproducible project tests are versioned for contributors and CI. Development generators, hardware-validation tools, audit/packaging scripts, and working scenes remain in an ignored local `tooling/` folder. CI runs bridge tests on Windows and builds the firmware.
+The public tree is focused on running, flashing, and maintaining this target. Reproducible project tests are versioned for contributors and CI. Development generators, hardware-validation tools, audit/packaging scripts, and working scenes remain in an ignored local `tooling/` folder. CI is configured to run bridge tests on Windows, macOS, and Linux and build the firmware.
 
 ## Privacy by design
 
@@ -147,7 +149,7 @@ Running the bridge creates **local** aggregate usage previews and logs. They are
 
 ## Contribute
 
-Useful next steps are physical enclosure fit reports, supported provider adapters, and tested ports to other boards or operating systems. Include board revision, measured dimensions, and reproducible steps; omit account details and raw logs. Read [CONTRIBUTING.md](CONTRIBUTING.md).
+Useful next steps are physical enclosure fit reports, supported provider adapters, and tested ports to other boards. Include board revision, measured dimensions, and reproducible steps; omit account details and raw logs. Read [CONTRIBUTING.md](CONTRIBUTING.md).
 
 PRs need a clear `type: description` title, completed purpose/implementation/validation sections, test evidence, passing CI, and review. New code dismisses stale approvals; review conversations must be resolved. See the [community standards](CODE_OF_CONDUCT.md).
 

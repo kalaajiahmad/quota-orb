@@ -1,5 +1,6 @@
 """Local desktop onboarding. No web server, credential fields, or remote backend."""
 import json
+import base64
 import os
 from pathlib import Path
 import queue
@@ -15,11 +16,31 @@ from .codex import CodexClient
 from .claude import ClaudeFileClient, configure_statusline
 from .model import normalize, SourceError, freshness
 from .providers import (ROOT,PROVIDERS,executable,launch_login,preferences,
-                        save_preferences,start_monitor)
+                        save_preferences)
+from .lifecycle import start_monitor, stop_monitor
 from .usb import Display
 from .ui import MotionButton, windows_app_identity, window_icon
+from .render import render, png_bytes
 
 BG, PANEL, TEXT, MUTED, ACCENT = '#0d1d23','#172e35','#e0eeee','#a9c4ca','#d7a17d'
+
+
+def start_issue(provider, port, verified, checked_port):
+    """Require quota access and, when selected, a verified physical board."""
+    if verified != provider:
+        return 'Verify quota access for the selected provider before starting.'
+    if port and checked_port != port:
+        return 'Check USB for the selected board before starting, or clear the port to use the desktop only.'
+    return None
+
+
+def demo_image():
+    """Render a clearly labelled demo independently of generated files."""
+    now = 2_000_000_000
+    sample = normalize({'rateLimits': {'limitId': 'codex', 'primary': {
+        'usedPercent': 28, 'windowDurationMins': 10080, 'resetsAt': now + 311040}}}, now=now)
+    return png_bytes(render(sample, now, tick=0))
+
 
 class Wizard:
     def __init__(self,root):
@@ -62,6 +83,9 @@ class Wizard:
         frame.bind('<Configure>',lambda _:canvas.configure(scrollregion=canvas.bbox('all')))
         canvas.bind('<Configure>',lambda event:canvas.itemconfigure(pane,width=event.width))
         root.bind('<MouseWheel>',lambda event:canvas.yview_scroll(-int(event.delta/120),'units'))
+        # X11 reports wheel motion as button presses rather than MouseWheel.
+        root.bind('<Button-4>', lambda _:canvas.yview_scroll(-1,'units'))
+        root.bind('<Button-5>', lambda _:canvas.yview_scroll(1,'units'))
         ttk.Label(frame,text='Quota Orb.',style='Title.TLabel').pack(anchor='w')
         ttk.Label(frame,text='Connect once. Keep your allowance in view.',style='Muted.TLabel').pack(anchor='w',pady=(0,14))
         self.section(frame,'1  /  Choose your provider')
@@ -81,13 +105,15 @@ class Wizard:
         self.button(row,'Enable Claude events',self.claude_enable)
         self.button(row,'Remove Claude link',self.claude_remove)
         ttk.Label(frame,textvariable=self.account_note,wraplength=730).pack(anchor='w',pady=(0,12))
-        self.section(frame,'3  /  Connect the Heltec by USB')
+        self.section(frame,'3  /  Connect the Heltec by USB (optional)')
+        ttk.Label(frame,text='Skip this step to use the desktop widget without a board.',style='Muted.TLabel').pack(anchor='w')
         row = ttk.Frame(frame)
         row.pack(fill='x',pady=8)
-        self.ports = ttk.Combobox(row,textvariable=self.port,state='readonly',width=12)
+        self.ports = ttk.Combobox(row,textvariable=self.port,state='readonly',width=24)
         self.ports.pack(side='left',padx=(0,8))
         self.button(row,'Find board',self.scan_ports)
         self.button(row,'Check USB',self.check_usb)
+        self.button(row,'Desktop only',self.clear_port)
         self.button(row,'Install V2 firmware',self.install_firmware)
         ttk.Label(frame,textvariable=self.usb_note,wraplength=730).pack(anchor='w',pady=(0,12))
         self.section(frame,'4  /  Start your monitor')
@@ -99,7 +125,9 @@ class Wizard:
         ttk.Label(frame,textvariable=self.run_note,wraplength=730).pack(anchor='w',pady=(0,10))
         ttk.Separator(frame).pack(fill='x',pady=10)
         ttk.Label(frame,textvariable=self.note,wraplength=730,style='Muted.TLabel').pack(anchor='w')
-        ttk.Label(frame,text='No passwords, tokens, cookies, or API keys are entered here.\nClosing setup keeps the notification icon running. Click it for the live display and layout studio; right-click to pause or quit. Login startup is off by default.',
+        desktop_note = ('Closing setup keeps the notification icon running. Click it for the live display and layout studio; right-click to pause or quit.'
+                        if os.name == 'nt' else 'Use the Quota Orb window to view the display and stop the monitor.')
+        ttk.Label(frame,text='No passwords, tokens, cookies, or API keys are entered here.\n'+desktop_note+' Login startup is off by default.',
                   wraplength=730,style='Muted.TLabel').pack(anchor='w',pady=(12,0))
         self.root.protocol('WM_DELETE_WINDOW',self.close)
         self.scan_ports()
@@ -158,7 +186,7 @@ class Wizard:
     def demo(self):
         preview = tk.Toplevel(self.root)
         preview.title('Quota Orb | Simulated output — no account connection')
-        picture = tk.PhotoImage(file=str(ROOT/'artifacts/demo.png'))
+        picture = tk.PhotoImage(data=base64.b64encode(demo_image()), master=preview)
         label = ttk.Label(preview,image=picture)
         label.image = picture
         label.pack(padx=20,pady=20)
@@ -243,7 +271,15 @@ class Wizard:
                 self.note.set('Ready to start after quota access is verified. USB checks require the monitor to be stopped.')
         self.work(check,done)
 
+    def clear_port(self):
+        self.port.set('')
+        self.checked_port = None
+        self.usb_note.set('Desktop only selected. No board is required.')
+
     def install_firmware(self):
+        if os.name != 'nt':
+            self.note.set('The guarded firmware installer currently requires Windows. Use a board already running Quota Orb firmware.')
+            return
         port = self.port.get()
         if not port:
             self.note.set('Select the physical board first.')
@@ -268,17 +304,19 @@ class Wizard:
                 return
         except (OSError,ValueError,TypeError):
             pass
-        if self.verified != provider or self.checked_port != port or not port:
-            self.note.set('Verify quota access and USB for the selected provider and board before starting.')
+        issue = start_issue(provider,port,self.verified,self.checked_port)
+        if issue:
+            self.note.set(issue)
             return
         def run():
-            save_preferences(provider,port)
-            start_monitor(provider,port)
-        self.work(run,lambda _:self.note.set('Monitor and notification icon started. Check the taskbar overflow arrow. Wait for an acknowledged frame below; right-click the icon to pause or quit.'))
+            save_preferences(provider,port or None)
+            start_monitor(provider,port or None)
+        message = ('Desktop monitor started. Open the display to add the widget.' if not port else
+                   'Monitor started. Wait for an acknowledged USB frame below.')
+        self.work(run,lambda _:self.note.set(message))
 
     def stop(self):
-        command = ['powershell.exe','-NoProfile','-ExecutionPolicy','Bypass','-File',str(ROOT/'scripts/Stop.ps1')]
-        self.work(lambda:subprocess.run(command,cwd=ROOT,check=True,creationflags=subprocess.CREATE_NO_WINDOW),
+        self.work(stop_monitor,
                   lambda _:self.note.set('Monitor stopped. The board shows USB OFFLINE within six seconds. Provider sign-in is unchanged.'))
 
     def monitor_status(self):
@@ -301,8 +339,6 @@ class Wizard:
         self.root.destroy()
 
 def main():
-    if os.name != 'nt':
-        raise SystemExit('The guided desktop setup currently supports Windows. See docs/SETUP.md.')
     windows_app_identity()
     root = tk.Tk()
     Wizard(root)
