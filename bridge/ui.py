@@ -20,6 +20,9 @@ def windows_app_identity():
 
 
 def window_icon(root):
+    if os.name != 'nt':
+        # Tk's iconbitmap expects XBM on Unix, not the bundled Windows ICO.
+        return
     from pathlib import Path
     path = Path(__file__).resolve().parents[1]/'assets/tray-live.ico'
     root.iconbitmap(default=str(path))

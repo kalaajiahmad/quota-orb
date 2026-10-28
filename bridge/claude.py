@@ -6,6 +6,7 @@ memory, whitelist numeric quota fields, and immediately discard everything else.
 import json
 import base64
 import os
+import shlex
 from pathlib import Path
 import sys
 import time
@@ -73,6 +74,10 @@ class ClaudeFileClient:
         pass
 
 def statusline_command():
+    if os.name != 'nt':
+        # Claude invokes this through a shell. Quote both fixed installation paths;
+        # no event content is ever incorporated into the command.
+        return f'cd {shlex.quote(str(ROOT))} && exec {shlex.quote(sys.executable)} -m bridge.claude'
     # Claude's Windows statusLine supports PowerShell. Literal quoting keeps
     # installation paths from becoming shell expressions; no input enters code.
     script = ROOT/'scripts/Claude-Statusline.ps1'

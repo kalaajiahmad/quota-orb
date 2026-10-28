@@ -18,6 +18,7 @@ from .providers import ROOT
 from .render import png_bytes, render
 from .model import normalize
 from .ui import MotionButton, StatusPulse, motion_enabled, windows_app_identity, window_icon
+from .desktop_widget import DesktopWidget, load_preferences, rendered_pixels
 
 BG, PANEL, TEXT, MUTED, ACCENT = '#0d1d23','#172e35','#e0eeee','#a9c4ca','#d7a17d'
 
@@ -62,6 +63,7 @@ class LiveDisplay:
         self.image = None
         self.setup = None
         self.studio = None
+        self.widget = None
         root.title('Quota Orb | Display studio' if not demo else 'Quota Orb | Simulated display')
         root.configure(bg=BG)
         window_icon(root)
@@ -103,20 +105,48 @@ class LiveDisplay:
             self.scale_buttons[scale] = button
         MotionButton(controls,'Edit layout',self.edit_layout,accent=True,height=32).pack(side='right',padx=(8,0))
         MotionButton(controls,'Setup',self.open_setup,height=32).pack(side='right')
+        MotionButton(controls,'Add widget',self.add_widget,height=32).pack(side='right',padx=(0,8))
         tk.Label(content,textvariable=self.detail,bg=BG,fg=MUTED,font=('Segoe UI',9),
                  wraplength=520,justify='left').pack(anchor='w',pady=(12,4))
-        tk.Label(content,text='Close this window to keep monitoring in the notification area.',
+        close_note = ('Close this window to keep monitoring in the notification area.' if os.name == 'nt'
+                      else 'Close the last Quota Orb window to stop monitoring.')
+        tk.Label(content,text=close_note,
                  bg=BG,fg=MUTED,font=('Segoe UI',8)).pack(anchor='w')
         self.redraw()
         root.update_idletasks()
         root.geometry(f'{content.winfo_reqwidth()}x{content.winfo_reqheight()}')
         root.bind('<Destroy>',self.destroyed,add='+')
+        root.protocol('WM_DELETE_WINDOW',self.close_window)
+        if not demo and load_preferences(self.runtime).get('enabled') is True:
+            self.add_widget()
         self.refresh_timer = root.after(0,self.refresh)
+
+    def add_widget(self):
+        if self.widget is None:
+            self.widget = DesktopWidget(self.root,self.runtime,self.widget_closed,self.demo)
+        else:
+            self.widget.window.deiconify()
+            self.widget.window.lift()
+
+    def widget_closed(self):
+        self.widget = None
+        if self.root.state() == 'withdrawn':
+            self.close_window()
+
+    def close_window(self):
+        if self.widget is not None:
+            self.root.withdraw()
+            return
+        if os.name != 'nt' and not self.demo:
+            self.runtime.mkdir(parents=True,exist_ok=True)
+            (self.runtime/'stop').touch()
+        self.root.destroy()
 
     def open_setup(self):
         if self.setup is None or self.setup.poll() is not None:
-            self.setup = subprocess.Popen([str(Path(sys.executable).with_name('pythonw.exe')),
-                '-m','bridge.onboarding'],cwd=ROOT,creationflags=subprocess.CREATE_NO_WINDOW)
+            program = Path(sys.executable).with_name('pythonw.exe') if os.name == 'nt' else sys.executable
+            self.setup = subprocess.Popen([str(program), '-m','bridge.onboarding'],
+                cwd=ROOT,creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
 
     def edit_layout(self):
         if self.studio is None:
@@ -194,6 +224,7 @@ class LiveDisplay:
                     'usedPercent':28,'windowDurationMins':10080,'resetsAt':int(now)+311040}}},now=now)
                 frame = render(snapshot,now)
                 data = {'running':True,'updated_at':now,'source':'LIVE','usb_connected':True,
+                    'rendered_frame':frame.hex(),
                     'display_frame':{'pixels':frame.hex(),'ack':{'type':'ack','seq':1,
                         'crc':zlib.crc32(frame)},'acknowledged_at':now}}
             else:
@@ -205,6 +236,8 @@ class LiveDisplay:
                 self.root.destroy()
                 return
             pixels = confirmed_pixels(data)
+            if self.widget is not None:
+                self.widget.update(data,rendered_pixels(data))
             if pixels is not None and pixels != self.frame:
                 self.frame = pixels
                 self.redraw()
@@ -226,6 +259,8 @@ class LiveDisplay:
             self.state.set('WAITING FOR MONITOR · last confirmed frame')
             self.state_label.configure(fg='#f1bd68')
             self.pulse.live = False
+            if self.widget is not None:
+                self.widget.update({},None)
         self.refresh_timer = self.root.after(200,self.refresh)
 
 

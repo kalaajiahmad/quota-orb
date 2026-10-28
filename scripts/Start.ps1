@@ -1,4 +1,4 @@
-param([string]$Port, [ValidateSet('codex','claude')][string]$Provider, [switch]$ShowWindow)
+param([string]$Port, [ValidateSet('codex','claude')][string]$Provider, [switch]$ShowWindow, [switch]$PreviewOnly)
 $ErrorActionPreference = 'Stop'
 if ($Port -and $Port -notmatch '^COM\d+$') { throw 'Port must look like COM4.' }
 $projectRoot = Split-Path -Parent $PSScriptRoot
@@ -22,6 +22,7 @@ $launchArguments = @('-m', 'bridge', '--quiet', '--provider', $Provider)
 if ($Port) {
     $launchArguments += @('--port', $Port)
 }
+if ($PreviewOnly) { $launchArguments += '--preview-only' }
 $launchedAt = 0
 $monitorProcess = $null
 if (-not $alreadyRunning) {
@@ -46,7 +47,7 @@ while ((Get-Date) -lt $deadline) {
     }
     if ($ready) {
         if ($ShowWindow -and $status.desktop_request_version -ne 1) {
-            throw 'The running monitor predates desktop launch requests. Run Stop Quota Orb.cmd, then start again from this release.'
+            throw 'The running monitor predates desktop launch requests. Quit the old monitor from its notification icon, then start again from this release.'
         }
         break
     }

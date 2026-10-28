@@ -26,7 +26,7 @@ After a matching sequence/CRC acknowledgement, the bridge saves the exact frame 
 
 Account reads occur every 60 seconds by default, with a minimum configured interval of 30 seconds. Frame updates occur at 1 Hz. Dependency versions are pinned. Upstream protocol changes should produce a visible source error; credential scraping is not an acceptable fallback.
 
-Windows notification-area/startup scripts are the supported delivery path. `Start Quota Orb.cmd` invokes `scripts/Start.ps1 -ShowWindow`; the compatibility `Start Codex Peek.cmd` adds `-Provider codex`. After notification registration succeeds, a manual start opens the branded live mirror or focuses its existing window. Repeated launches reuse the running monitor and do not create another provider client or USB owner. Direct script use without `-ShowWindow` and optional login startup remain notification-area-only. `Stop Codex Peek.cmd` and `Stop Quota Orb.cmd` share `scripts/Stop.ps1`. Other operating systems are contribution areas, not supported features.
+The canonical application entry point is `python -m bridge.launch`. The Windows and Unix bootstrap launchers prepare the local environment and invoke that same entry point. It opens setup on first use and otherwise starts or focuses the desktop display using saved preferences. An older extracted folder remains a separate installation and must be stopped before switching releases.
 
 Startup confirms a fresh heartbeat, registered notification icon, and live monitor PID for both new and existing instances. `-ShowWindow` then writes an asynchronous `open-display` request under `.runtime/`. The monitor consumes it in its main loop and owns the desktop subprocess; repeat requests focus the existing window. A sharing lock on the request file is retried on the next frame without stopping account polling or USB updates. Desktop creation failures remain visible in the local stderr log.
 
@@ -38,7 +38,7 @@ The mirror's Windows app identity and icon identify its taskbar window; they do 
 
 ## Guided setup and providers
 
-`Run Quota Orb.cmd` invokes `scripts/Launch.ps1`, which creates the local environment and opens the native Tk desktop wizard. No HTTP listener is used. Provider login commands use fixed argument arrays and a visible vendor-owned console; Quota Orb does not capture their output. It verifies usable quota fields before enabling monitor start.
+`Run Quota Orb.cmd` invokes `scripts/Launch.ps1`, which prepares the local environment and starts the shared launcher. The launcher opens the native Tk desktop wizard when setup is needed. No HTTP listener is used. Provider login commands use fixed argument arrays and a visible vendor-owned console; Quota Orb does not capture their output. It verifies usable quota fields before enabling monitor start.
 
 Codex retains the existing read-only app-server path. Claude's opt-in status line sends JSON through local stdin to `bridge/claude.py`; that adapter saves only whitelisted numeric five-hour/weekly quota fields and receipt time. `ClaudeFileClient` preserves the original event time on every cache read so idle data becomes stale. It never refreshes age merely by rereading a file. Events are not a guarantee of a new server quota query.
 

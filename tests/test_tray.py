@@ -1,13 +1,16 @@
 import os
+import ctypes as C
+from ctypes import wintypes as W
 from pathlib import Path
 import queue
 import tempfile
 import unittest
 import uuid
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, call
 
 from bridge.__main__ import UsageSession, main
-from bridge.tray import presentation, status_text, Tray
+from bridge.tray import (presentation, status_text, Tray, track_tray_menu,
+                         shell_window_rect, MonitorInfo, PopupParameters)
 
 
 class Worker:
@@ -63,6 +66,56 @@ class SessionTests(unittest.TestCase):
 
 
 class TrayTests(unittest.TestCase):
+    def test_shell_panel_is_excluded_on_negative_coordinate_monitor(self):
+        user = Mock()
+        user.WindowFromPoint.return_value = 11
+        user.GetAncestor.return_value = 12
+        user.GetShellWindow.return_value = 13
+        user.MonitorFromPoint.return_value = 14
+        def pid(hwnd, out):
+            C.cast(out, C.POINTER(W.DWORD)).contents.value = 42
+        def rectangle(hwnd, out):
+            rect = C.cast(out, C.POINTER(W.RECT)).contents
+            rect.left, rect.top, rect.right, rect.bottom = -400, 800, -100, 1000
+            return True
+        def monitor(handle, out):
+            info = C.cast(out, C.POINTER(MonitorInfo)).contents
+            info.rcMonitor = W.RECT(-1920, 0, 0, 1080)
+            return True
+        user.GetWindowThreadProcessId.side_effect = pid
+        user.GetWindowRect.side_effect = rectangle
+        user.GetMonitorInfoW.side_effect = monitor
+        rect = shell_window_rect(user, W.POINT(-250, 900))
+        self.assertEqual((rect.left, rect.top, rect.right, rect.bottom), (-400, 800, -100, 1000))
+        self.assertIsNone(shell_window_rect(user, W.POINT(-50, 900)))
+        def wrong_process(hwnd, out):
+            C.cast(out, C.POINTER(W.DWORD)).contents.value = hwnd
+        user.GetWindowThreadProcessId.side_effect = wrong_process
+        self.assertIsNone(shell_window_rect(user, W.POINT(-250, 900)))
+
+    def test_menu_passes_the_excluded_panel_to_windows_and_cleans_up(self):
+        user = Mock()
+        captured = []
+        def track(menu, flags, x, y, owner, params):
+            p = C.cast(params, C.POINTER(PopupParameters)).contents
+            captured.append((flags, x, y, p.cbSize, p.rcExclude.left, p.rcExclude.top,
+                             p.rcExclude.right, p.rcExclude.bottom))
+            return 4
+        user.TrackPopupMenuEx.side_effect = track
+        point = W.POINT(-250, 900)
+        self.assertEqual(track_tray_menu(user, 123, 456, point, W.RECT(-400, 800, -100, 1000)), 4)
+        self.assertEqual(captured, [(0x142, -250, 900, C.sizeof(PopupParameters), -400, 800, -100, 1000)])
+        self.assertEqual(user.mock_calls[0], call.SetWindowPos(123, -1, 0, 0, 0, 0, 0x53))
+        self.assertEqual(user.mock_calls[-2:], [call.PostMessageW(123, 0, 0, 0),
+                         call.SetWindowPos(123, -2, 0, 0, 0, 0, 0x93)])
+
+    def test_menu_always_hides_the_owner_when_tracking_fails(self):
+        user = Mock()
+        user.TrackPopupMenuEx.side_effect = RuntimeError('menu failed')
+        with self.assertRaises(RuntimeError):
+            track_tray_menu(user, 123, 456, W.POINT(0, 0))
+        self.assertEqual(user.mock_calls[-1], call.SetWindowPos(123, -2, 0, 0, 0, 0, 0x93))
+
     def test_icons_distinguish_live_stale_missing_and_paused(self):
         status = {'provider': 'codex', 'source': 'LIVE', 'usb_connected': True}
         self.assertEqual(presentation(status)[0], 'live')

@@ -1,13 +1,15 @@
 import json
+import os
 from pathlib import Path
 import tempfile
 import time
 import unittest
 from unittest.mock import patch
+from unittest.mock import Mock
 
 from bridge.claude import sanitized_event, save_event, ClaudeFileClient, configure_statusline, statusline_command
 from bridge.model import normalize, freshness, SourceError
-from bridge.providers import login_command, preferences, save_preferences, launch_login
+from bridge.providers import login_command, preferences, save_preferences, launch_login, valid_port
 
 class ClaudeSecurityTests(unittest.TestCase):
     def event(self):
@@ -84,6 +86,12 @@ class ClaudeSecurityTests(unittest.TestCase):
                 configure_statusline(path,remove=True)
             self.assertEqual(json.loads(path.read_text())['statusLine']['command'],'other')
 
+    def test_posix_statusline_quotes_paths(self):
+        import shlex
+        with patch('bridge.claude.os.name', 'posix'), patch('bridge.claude.ROOT', '/tmp/orb path'), patch('bridge.claude.sys.executable', '/tmp/python path'):
+            command = statusline_command()
+        self.assertEqual(shlex.split(command), ['cd', '/tmp/orb path', '&&', 'exec', '/tmp/python path', '-m', 'bridge.claude'])
+
 class ProviderFlowTests(unittest.TestCase):
     def test_login_uses_only_fixed_vendor_arguments(self):
         self.assertEqual(login_command('codex','provider.exe'),['provider.exe','login'])
@@ -92,7 +100,8 @@ class ProviderFlowTests(unittest.TestCase):
             login_command('gemini','provider.exe')
 
     def test_auth_output_is_not_captured_or_redirected(self):
-        with patch('bridge.providers.subprocess.Popen') as run:
+        with patch('bridge.providers.subprocess.Popen') as run, patch('bridge.providers.sys.stdin') as stdin:
+            stdin.isatty.return_value = True
             launch_login('codex','provider.exe')
             args,kwargs = run.call_args
             self.assertNotIn('shell',kwargs)
@@ -100,11 +109,22 @@ class ProviderFlowTests(unittest.TestCase):
             self.assertNotIn('stderr',kwargs)
             self.assertEqual(args[0],['provider.exe','login'])
 
+    def test_serial_port_validation_supports_native_device_paths(self):
+        for port in ('COM1', 'COM42', 'com3'):
+            self.assertTrue(valid_port(port, 'nt'))
+        for port in ('COM0', 'COM1;evil', '/dev/ttyUSB0'):
+            self.assertFalse(valid_port(port, 'nt'))
+        for port in ('/dev/ttyUSB0', '/dev/cu.usbserial-1', '/dev/serial/by-id/usb-device'):
+            self.assertTrue(valid_port(port, 'posix'))
+        for port in ('COM1', '/dev/../tmp/file', '/dev//ttyUSB0', '/dev/tty\nUSB0'):
+            self.assertFalse(valid_port(port, 'posix'))
+
     def test_preferences_store_only_nonsecret_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp)/'prefs.json'
-            save_preferences('claude','COM99',path)
-            self.assertEqual(preferences(path),{'provider':'claude','port':'COM99'})
+            port = 'COM99' if os.name == 'nt' else '/dev/ttyUSB0'
+            save_preferences('claude',port,path)
+            self.assertEqual(preferences(path),{'provider':'claude','port':port})
             self.assertEqual(set(json.loads(path.read_text())),{'provider','port'})
             with self.assertRaises(SourceError):
                 save_preferences('gemini',path=path)
@@ -116,6 +136,43 @@ class ProviderFlowTests(unittest.TestCase):
             self.assertEqual(preferences(path),{'provider':'codex','port':None})
             path.write_text('{"provider":"claude","port":"bad"}')
             self.assertEqual(preferences(path),{'provider':'claude','port':None})
+
+
+class MonitorStartTests(unittest.TestCase):
+    def test_demo_is_rendered_without_files(self):
+        from bridge.onboarding import demo_image
+        self.assertTrue(demo_image().startswith(b'\x89PNG\r\n\x1a\n'))
+
+    def test_desktop_only_starts_without_a_board(self):
+        from bridge.onboarding import Wizard
+        with tempfile.TemporaryDirectory() as tmp, patch('bridge.onboarding.ROOT', Path(tmp)), \
+             patch('bridge.onboarding.save_preferences') as save, \
+             patch('bridge.onboarding.start_monitor') as start:
+            wizard = Mock()
+            wizard.provider.get.return_value = 'codex'
+            wizard.port.get.return_value = ''
+            wizard.verified = 'codex'
+            wizard.checked_port = None
+            wizard.work.side_effect = lambda action, done: (action(), done(None))
+            Wizard.start(wizard)
+            save.assert_called_once_with('codex', None)
+            start.assert_called_once_with('codex', None)
+
+    def test_selected_board_must_be_verified(self):
+        from bridge.onboarding import Wizard
+        with tempfile.TemporaryDirectory() as tmp, patch('bridge.onboarding.ROOT', Path(tmp)):
+            wizard = Mock()
+            wizard.provider.get.return_value = 'codex'
+            wizard.port.get.return_value = 'COM1'
+            wizard.verified = 'codex'
+            wizard.checked_port = None
+            Wizard.start(wizard)
+            wizard.work.assert_not_called()
+            self.assertIn('Check USB', wizard.note.set.call_args.args[0])
+
+    def test_quota_access_still_required_for_desktop_only(self):
+        from bridge.onboarding import start_issue
+        self.assertIn('Verify quota access', start_issue('codex', '', None, None))
 
 if __name__ == '__main__':
     unittest.main()

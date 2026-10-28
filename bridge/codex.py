@@ -21,10 +21,11 @@ def find_codex(explicit=None):
     path = shutil.which("codex")
     if path:
         return path
-    base = Path(os.environ.get("LOCALAPPDATA", "")) / "OpenAI" / "Codex" / "bin"
-    candidates = list(base.glob("*/codex.exe"))
-    if candidates:
-        return str(max(candidates, key=lambda p: p.stat().st_mtime))
+    if os.name == 'nt' and os.environ.get('LOCALAPPDATA'):
+        base = Path(os.environ['LOCALAPPDATA']) / "OpenAI" / "Codex" / "bin"
+        candidates = list(base.glob("*/codex.exe"))
+        if candidates:
+            return str(max(candidates, key=lambda p: p.stat().st_mtime))
     raise SourceError("Codex CLI not found. Install Codex or pass --codex PATH")
 
 

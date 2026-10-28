@@ -6,12 +6,70 @@ commands are queued to the bridge; icon registration failure stops monitoring.
 import ctypes as C
 from ctypes import wintypes as W
 import os
+import logging
 from pathlib import Path
 import threading
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
 ICON_GUID = uuid.UUID('11e6796a-a5ff-489e-a2df-b613bb71e8c7')
+
+# A visible, zero-sized topmost owner lets Windows foreground the notification
+# menu and keeps the owned popup above the taskbar overflow panel.
+HWND_TOPMOST, HWND_NOTOPMOST = -1, -2
+SWP_NOSIZE, SWP_NOMOVE, SWP_NOACTIVATE = 0x0001, 0x0002, 0x0010
+SWP_SHOWWINDOW, SWP_HIDEWINDOW = 0x0040, 0x0080
+
+
+class PopupParameters(C.Structure):
+    _fields_ = [('cbSize', W.UINT), ('rcExclude', W.RECT)]
+
+
+class MonitorInfo(C.Structure):
+    _fields_ = [('cbSize', W.DWORD), ('rcMonitor', W.RECT),
+                ('rcWork', W.RECT), ('dwFlags', W.DWORD)]
+
+
+def shell_window_rect(user, point):
+    """Find the Explorer-owned panel beneath the click, bounded to its monitor."""
+    hit = user.WindowFromPoint(point)
+    window = user.GetAncestor(hit, 2) if hit else None  # GA_ROOT
+    shell = user.GetShellWindow()
+    if not window or not shell:
+        return None
+    hit_pid, shell_pid = W.DWORD(), W.DWORD()
+    user.GetWindowThreadProcessId(window, C.byref(hit_pid))
+    user.GetWindowThreadProcessId(shell, C.byref(shell_pid))
+    if not hit_pid.value or hit_pid.value != shell_pid.value:
+        return None
+    rect = W.RECT()
+    info = MonitorInfo(cbSize=C.sizeof(MonitorInfo))
+    monitor = user.MonitorFromPoint(point, 2)  # MONITOR_DEFAULTTONEAREST
+    if not user.GetWindowRect(window, C.byref(rect)) or not monitor or not user.GetMonitorInfoW(monitor, C.byref(info)):
+        return None
+    width, height = rect.right - rect.left, rect.bottom - rect.top
+    screen = info.rcMonitor
+    screen_area = (screen.right - screen.left) * (screen.bottom - screen.top)
+    # Reject desktop-sized Explorer windows or stale/invalid hit-test results.
+    if (width <= 0 or height <= 0 or screen_area <= 0 or width * height > screen_area / 2 or
+            not (rect.left <= point.x < rect.right and rect.top <= point.y < rect.bottom)):
+        return None
+    return rect
+
+
+def track_tray_menu(user, owner, popup, point, excluded=None):
+    """Avoid the shell panel, foreground the menu, then restore the hidden owner."""
+    position_flags = SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE
+    params = PopupParameters(C.sizeof(PopupParameters), excluded) if excluded is not None else None
+    user.SetWindowPos(owner, HWND_TOPMOST, 0, 0, 0, 0, position_flags | SWP_SHOWWINDOW)
+    try:
+        user.SetForegroundWindow(owner)
+        return user.TrackPopupMenuEx(popup, 0x100 | 0x2 | 0x40, point.x, point.y, owner,
+                                     C.byref(params) if params else None)
+    finally:
+        # WM_NULL is the documented notification-menu dismissal workaround.
+        user.PostMessageW(owner, 0, 0, 0)
+        user.SetWindowPos(owner, HWND_NOTOPMOST, 0, 0, 0, 0, position_flags | SWP_HIDEWINDOW)
 
 def presentation(status):
     provider = {'codex':'Codex','claude':'Claude Code'}.get(status.get('provider'),'Provider')
@@ -111,6 +169,8 @@ class Tray:
         CALLBACK = C.WINFUNCTYPE(LRESULT,W.HWND,W.UINT,W.WPARAM,W.LPARAM)
         class GUID(C.Structure):
             _fields_ = [('a',W.DWORD),('b',W.WORD),('c',W.WORD),('d',C.c_ubyte*8)]
+        class IconIdentifier(C.Structure):
+            _fields_ = [('cbSize', W.DWORD), ('hWnd', W.HWND), ('uID', W.UINT), ('guidItem', GUID)]
         class NID(C.Structure):
             _fields_ = [('cbSize',W.DWORD),('hWnd',W.HWND),('uID',W.UINT),('uFlags',W.UINT),
                 ('uCallbackMessage',W.UINT),('hIcon',W.HICON),('szTip',W.WCHAR*128),
@@ -146,12 +206,21 @@ class Tray:
         api(user,'GetSystemMetrics',C.c_int,C.c_int)
         api(user,'CreatePopupMenu',W.HMENU)
         api(user,'AppendMenuW',W.BOOL,W.HMENU,W.UINT,C.c_size_t,W.LPCWSTR)
-        api(user,'TrackPopupMenu',W.UINT,W.HMENU,W.UINT,C.c_int,C.c_int,C.c_int,W.HWND,W.LPVOID)
+        api(user,'TrackPopupMenuEx',W.UINT,W.HMENU,W.UINT,C.c_int,C.c_int,W.HWND,C.POINTER(PopupParameters))
         api(user,'DestroyMenu',W.BOOL,W.HMENU)
         api(user,'GetCursorPos',W.BOOL,C.POINTER(W.POINT))
         api(user,'SetForegroundWindow',W.BOOL,W.HWND)
+        api(user,'SetWindowPos',W.BOOL,W.HWND,W.HWND,C.c_int,C.c_int,C.c_int,C.c_int,W.UINT)
+        api(user,'WindowFromPoint',W.HWND,W.POINT)
+        api(user,'GetAncestor',W.HWND,W.HWND,W.UINT)
+        api(user,'GetShellWindow',W.HWND)
+        api(user,'GetWindowThreadProcessId',W.DWORD,W.HWND,C.POINTER(W.DWORD))
+        api(user,'GetWindowRect',W.BOOL,W.HWND,C.POINTER(W.RECT))
+        api(user,'MonitorFromPoint',W.HANDLE,W.POINT,W.DWORD)
+        api(user,'GetMonitorInfoW',W.BOOL,W.HANDLE,C.POINTER(MonitorInfo))
         api(user,'MessageBoxW',C.c_int,W.HWND,W.LPCWSTR,W.LPCWSTR,W.UINT)
         api(shell,'Shell_NotifyIconW',W.BOOL,W.DWORD,C.POINTER(NID))
+        api(shell,'Shell_NotifyIconGetRect',C.c_long,C.POINTER(IconIdentifier),C.POINTER(W.RECT))
         callback_message = 0x8000+17
         taskbar_created = user.RegisterWindowMessageW('TaskbarCreated')
         instance = kernel.GetModuleHandleW(None)
@@ -197,11 +266,22 @@ class Tray:
                     (3,'Resume monitoring' if self.snapshot().get('paused') else 'Pause monitoring'),
                     (4,'Quit Quota Orb')]:
                     user.AppendMenuW(popup,0,identifier,title)
-                user.SetForegroundWindow(self.hwnd)
-                chosen = user.TrackPopupMenu(popup,0x100|0x2,point.x,point.y,0,self.hwnd,None)
+                excluded = shell_window_rect(user,point)
+                exclusion_source = 'shell panel'
+                if excluded is None:
+                    exclusion_source = 'notification icon'
+                    identifier = IconIdentifier(C.sizeof(IconIdentifier), self.hwnd, 1, nid.guidItem)
+                    icon_rect = W.RECT()
+                    if shell.Shell_NotifyIconGetRect(C.byref(identifier), C.byref(icon_rect)) == 0:
+                        excluded = icon_rect
+                if excluded is None:
+                    logging.warning('Tray menu could not identify an exclusion rectangle')
+                else:
+                    logging.info('Tray menu excludes %s at (%d, %d, %d, %d)', exclusion_source,
+                                 excluded.left, excluded.top, excluded.right, excluded.bottom)
+                chosen = track_tray_menu(user,self.hwnd,popup,point,excluded)
                 if chosen:
                     self.action(chosen)
-                user.PostMessageW(self.hwnd,0,0,0)
                 shell.Shell_NotifyIconW(3,C.byref(nid))
             finally:
                 user.DestroyMenu(popup)
@@ -240,7 +320,7 @@ class Tray:
         if not user.RegisterClassW(C.byref(wc)):
             raise C.WinError(C.get_last_error())
         try:
-            self.hwnd = user.CreateWindowExW(0,class_name,'Quota Orb notification icon',0,0,0,0,0,None,None,instance,None)
+            self.hwnd = user.CreateWindowExW(0x80,class_name,'Quota Orb notification icon',0x80000000,0,0,0,0,None,None,instance,None)
             if not self.hwnd:
                 raise C.WinError(C.get_last_error())
             nid.hWnd = self.hwnd
