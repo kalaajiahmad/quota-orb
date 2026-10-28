@@ -31,7 +31,7 @@ jobs:
               print('PR structure validated. Maintainer review must assess substance and evidence.')
           else:
               print('PR description check applies to pull requests.')
-  bridge:
+  bridge-platforms:
     strategy:
       fail-fast: false
       matrix:
@@ -47,6 +47,20 @@ jobs:
       - run: pip install -r requirements.txt
       - run: python -m compileall -q bridge
       - run: python -m unittest discover -s tests -v
+  bridge:
+    # Keep the required branch-protection check stable as platforms change.
+    if: ${{ always() }}
+    needs: bridge-platforms
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all platform tests to pass
+        env:
+          BRIDGE_RESULT: ${{ needs['bridge-platforms'].result }}
+        run: |
+          if [ "$BRIDGE_RESULT" != "success" ]; then
+            echo "One or more platform tests failed or were skipped: $BRIDGE_RESULT"
+            exit 1
+          fi
   firmware:
     runs-on: ubuntu-latest
     steps:
